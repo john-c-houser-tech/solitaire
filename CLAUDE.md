@@ -40,7 +40,13 @@ Enforced by `eslint.config.js` (ESLint recommended plus a few style rules). `npm
 
 ## Git
 
-Commit directly to `main`. Push only when asked.
+`main` is John's: never commit or push to it, and never force-push. `dev` is the integration branch.
+
+1. Before any new work: `git checkout dev && git pull --ff-only`.
+2. Branch from dev: `git checkout -b <feature>`. Check `git branch --show-current` before every commit.
+3. Commit there, push the branch, and open a PR into dev: `gh pr create --base dev`.
+4. Request a Copilot review (`gh pr edit <n> --add-reviewer @copilot`) and address its comments with follow-up commits.
+5. John merges to main. Wait for him.
 
 ## Agent skills
 
