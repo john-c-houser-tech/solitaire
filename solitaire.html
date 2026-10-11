@@ -1,0 +1,1783 @@
+<title>Quiet Solitaire</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,500;0,6..96,700;1,6..96,500&family=Cinzel:wght@600;700&family=IBM+Plex+Sans+Condensed:wght@400;500;600&family=Josefin+Sans:wght@700&family=Limelight&family=Noto+Sans+Runic&family=Poiret+One&family=Uncial+Antiqua&display=swap">
+<style>
+/* Layout: one-screen card table. A thin control strip on top, then the board: a top row (stock/cells/foundations)
+   and a tableau row, with card size derived from the column count and the viewport width. */
+/* Each deck theme is a single committed look (table + faces + backs), so there is no light/dark split. */
+:root, [data-deck="casino"] {
+  --table: radial-gradient(ellipse 120% 90% at 50% 15%, #23624b 0%, #154434 55%, #0b281f 100%);
+  --ink: #eef0e6; --ink-dim: #a8c2b4; --accent: #e2c070; --accent-ink: #172a20; --line: rgba(236,240,226,.2);
+  --card-bg: #fbf8ef; --card-solid: #fbf8ef; --card-edge: #d8d0bb; --frame: transparent; --burn: transparent;
+  --red: #b4232f; --black: #17191e;
+  --idx-font: "Bodoni Moda", Didot, "Bodoni 72", Georgia, serif;
+  --court-font: "Bodoni Moda", Didot, "Bodoni 72", Georgia, serif;
+  --name-font: "Bodoni Moda", Georgia, serif;
+  --mark-font: "Bodoni Moda", Didot, Georgia, serif;
+  --ui-font: "IBM Plex Sans Condensed", "Roboto Condensed", "Arial Narrow", system-ui, sans-serif;
+  color-scheme: dark;
+}
+[data-deck="deco"] {
+  --table: radial-gradient(circle at 50% 100%, transparent 0 9px, rgba(212,169,79,.11) 9px 10px, transparent 10px 13px, rgba(212,169,79,.07) 13px 14px, transparent 14px) 0 0 / 28px 14px,
+           radial-gradient(ellipse at 50% 0%, #24211b, #0b0a08 70%);
+  --ink: #f1e6c8; --ink-dim: #a99a74; --accent: #d9ae55; --accent-ink: #0f0e0c; --line: rgba(217,174,85,.3);
+  --card-bg: #f5edd9; --card-solid: #f5edd9; --card-edge: #c9b27a; --frame: #b98d3c; --burn: transparent;
+  --red: #a5302a; --black: #121110;
+  --idx-font: "Josefin Sans", Futura, "Century Gothic", sans-serif;
+  --court-font: Limelight, Georgia, serif;
+  --name-font: "Poiret One", "Futura", sans-serif;
+  --mark-font: Limelight, Georgia, serif;
+}
+[data-deck="ring"] {
+  --table: radial-gradient(ellipse 110% 80% at 50% 0%, #2e2c1d 0%, #151711 55%, #080906 100%);
+  --ink: #efe2c0; --ink-dim: #a99d7c; --accent: #e8a945; --accent-ink: #1b1206; --line: rgba(232,200,140,.22);
+  --card-bg: radial-gradient(ellipse at 50% 42%, #f6ebcd 0%, #ecd9ab 65%, #dcc08a 100%);
+  --card-solid: #eedcb0; --card-edge: #b89660; --frame: #8a6532; --burn: rgba(120,62,12,.5);
+  --red: #8f1d14; --black: #2b1c10;
+  --idx-font: Cinzel, "Trajan Pro", Georgia, serif;
+  --court-font: Cinzel, "Trajan Pro", Georgia, serif;
+  --name-font: "Uncial Antiqua", Cinzel, Georgia, serif;
+  --mark-font: "Uncial Antiqua", Georgia, serif;
+}
+
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body {
+  margin: 0; background: var(--table); background-color: #0b0a08; background-attachment: fixed;
+  color: var(--ink); font-family: var(--ui-font); overflow-x: hidden;
+  -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
+}
+.wrap { max-width: 1240px; margin: 0 auto; padding-inline: 16px; padding-block: 10px 20px; box-sizing: border-box; }
+
+/* ---------- control strip ---------- */
+.bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; padding-block: 4px 14px; }
+.mark { font: 400 1.55rem/1 var(--mark-font); margin: 0; letter-spacing: .01em; color: var(--ink); white-space: nowrap; }
+[data-deck="casino"] .mark { font-style: italic; font-weight: 500; }
+.stats { display: flex; gap: 14px; color: var(--ink-dim); font-size: .92rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.stats b { color: var(--ink); font-weight: 600; }
+.tools { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
+.group { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+button {
+  font: 500 .9rem/1 var(--ui-font); color: var(--ink); background: rgba(0,0,0,.22);
+  border: 1px solid var(--line); border-radius: 6px; padding: 7px 12px; cursor: pointer;
+}
+button:hover { border-color: var(--accent); }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button:disabled { opacity: .4; cursor: default; border-color: var(--line); }
+.seg { display: inline-flex; }
+.seg button { border-radius: 0; margin-left: -1px; }
+.seg button:first-child { border-radius: 6px 0 0 6px; margin-left: 0; }
+.seg button:last-child { border-radius: 0 6px 6px 0; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); position: relative; }
+.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+
+.notice { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 12px; padding: 9px 12px;
+  border: 1px solid var(--accent); border-radius: 8px; background: rgba(0,0,0,.35); }
+.notice span { flex: 1 1 220px; }
+
+/* ---------- board ---------- */
+#table { position: relative; touch-action: none; min-height: 200px; }
+.slot {
+  position: absolute; left: 0; top: 0; width: var(--cw); height: var(--ch); box-sizing: border-box;
+  border: 1.5px solid var(--line); border-radius: calc(var(--cw) * .075);
+  display: grid; place-items: center; color: var(--line); font: 400 calc(var(--cw) * .36)/1 var(--court-font);
+}
+.slot[data-kind="tab"] { border-style: dashed; }
+.slot[data-kind="stock"] { cursor: pointer; font-size: calc(var(--cw) * .45); }
+.slot[data-kind="cell"] { background: rgba(0,0,0,.14); }
+
+.card {
+  position: absolute; left: 0; top: 0; width: var(--cw); height: var(--ch);
+  border-radius: calc(var(--cw) * .075);
+  transition: transform .2s cubic-bezier(.2,.75,.3,1), box-shadow .15s;
+  box-shadow: 0 1px 2px rgba(0,0,0,.4), 0 2px 7px rgba(0,0,0,.2);
+}
+.still .card { transition: none !important; }
+.card.up { cursor: grab; }
+.card.drag { transition: none; cursor: grabbing; will-change: transform; box-shadow: 0 14px 28px rgba(0,0,0,.5); }
+.card.sel { box-shadow: 0 0 0 2px var(--accent), 0 0 18px color-mix(in srgb, var(--accent) 55%, transparent), 0 8px 16px rgba(0,0,0,.45); }
+.kbd .cur { outline: 3px solid var(--accent); outline-offset: 3px; }
+.face, .back { position: absolute; inset: 0; border-radius: inherit; }
+.back { display: none; width: 100%; height: 100%; }
+.card.down .back { display: block; }
+.card.down .face { display: none; }
+.face { display: block; overflow: hidden; }
+.face svg { display: block; width: 100%; height: 100%; }
+.face::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  box-shadow: inset 0 0 0 1px var(--card-edge), inset 0 0 calc(var(--cw) * .09) var(--burn); }
+/* Bitmap copies of each face and back (see "bitmap faces" in the script). Until one is ready the live SVG shows. */
+.rf, .rb { position: absolute; inset: 0; width: 100%; height: 100%; display: none; border-radius: inherit;
+  pointer-events: none; -webkit-touch-callout: none; -webkit-user-drag: none; }
+.card.hf .rf { display: block; }
+.card.hf .face svg { display: none; }
+.card.down.hb .back { display: none; }
+.card.down.hb .rb { display: block; }
+.face .sm { display: none; }
+.small .face .sm { display: inline; }
+.small .face .lg { display: none; }
+
+.foot { color: var(--ink-dim); font-size: .85rem; margin: 14px 0 0; }
+.foot kbd { font: 600 .78rem var(--ui-font); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; }
+
+/* ---------- panels ---------- */
+.overlay { position: fixed; inset: 0; z-index: 5000; display: grid; place-items: center; padding: 16px;
+  background: rgba(5,6,4,.62); backdrop-filter: blur(2px); }
+.panel { background: var(--card-solid); color: var(--black); border-radius: 12px; width: 100%; max-width: 560px;
+  max-height: 88vh; overflow: auto; padding: 22px 24px; box-sizing: border-box; box-shadow: 0 24px 60px rgba(0,0,0,.5); }
+.panel h2 { font: 400 1.7rem/1.1 var(--mark-font); margin: 0 0 6px; text-wrap: balance; }
+.panel h3 { font: 600 .78rem/1 var(--ui-font); text-transform: uppercase; letter-spacing: .08em; margin: 18px 0 8px; opacity: .7; }
+.panel p { margin: 0 0 8px; line-height: 1.45; }
+.panel button { color: var(--black); background: transparent; border-color: color-mix(in srgb, var(--black) 30%, transparent); }
+.panel button.primary { background: var(--black); color: var(--card-solid); border-color: var(--black); }
+.keys { display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; margin: 0; font-size: .92rem; }
+.keys dt { white-space: nowrap; }
+.keys dd { margin: 0; }
+.panel kbd { font: 600 .78rem var(--ui-font); border: 1px solid color-mix(in srgb, var(--black) 35%, transparent);
+  border-bottom-width: 2px; border-radius: 4px; padding: 1px 6px; background: rgba(255,255,255,.5); }
+.row-end { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+
+.decks { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 12px; }
+.deckopt { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; text-align: left; padding: 12px;
+  border-radius: 10px; background: var(--table); color: var(--ink) !important; border: 2px solid transparent !important; }
+.deckopt[aria-pressed="true"] { border-color: var(--accent) !important; }
+.deckopt b { font: 400 1.1rem/1.1 var(--mark-font); }
+.deckopt small { font: .8rem/1.3 var(--ui-font); color: var(--ink-dim); }
+.mini { --cw: 58px; --ch: 81px; display: flex; height: 81px; margin-bottom: 4px; }
+.mini .card { position: relative; transform: none; flex: none; }
+.mini .card + .card { margin-left: -20px; transform: rotate(8deg) translateY(3px); }
+
+.toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 6000;
+  background: var(--card-solid); color: var(--black); padding: 10px 16px; border-radius: 8px; font-size: .92rem; box-shadow: 0 8px 24px rgba(0,0,0,.4); max-width: calc(100% - 32px); }
+.cele { position: fixed; inset: 0; z-index: 4500; cursor: pointer; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+@media (max-width: 640px) {
+  .mark { font-size: 1.25rem; }
+  .tools { margin-left: 0; }
+  button { padding: 7px 10px; font-size: .85rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .card { transition: none; }
+}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs id="backs"></defs></svg>
+
+<div class="wrap">
+  <header class="bar">
+    <h1 class="mark">Quiet Solitaire</h1>
+    <div class="group">
+      <div class="seg" id="games" role="group" aria-label="Game"></div>
+      <div class="group" id="opts"></div>
+    </div>
+    <div class="stats" aria-live="off"><span><b id="moves">0</b> moves</span><span><b id="time">0:00</b></span></div>
+    <div class="tools">
+      <button id="bNew" type="button">New game</button>
+      <button id="bUndo" type="button">Undo</button>
+      <button id="bFinish" class="primary" type="button" hidden>Finish</button>
+      <button id="bDeck" type="button">Deck</button>
+      <button id="bHelp" type="button" aria-label="Keys and rules">?</button>
+    </div>
+  </header>
+  <div id="notice" class="notice" hidden><span id="noticeText"></span><button id="nYes" class="primary" type="button">Deal new game</button><button id="nNo" type="button">Keep playing</button></div>
+  <main id="table" aria-label="Card table"></main>
+  <p class="foot">Drag cards, or use the arrow keys and <kbd>Space</kbd>. Press <kbd>?</kbd> for every key.</p>
+</div>
+
+<div id="help" class="overlay" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+    <h2 id="helpTitle">How to play</h2>
+    <p id="rules"></p>
+    <h3>Mouse</h3>
+    <dl class="keys">
+      <dt>Drag</dt><dd>Move a card, or a run of cards, to another pile</dd>
+      <dt>Click, click</dt><dd>Pick a card up, then click where it goes</dd>
+      <dt>Double-click</dt><dd>Send a card to the best spot, foundations first</dd>
+      <dt>Stock</dt><dd>Click to deal; click the empty stock to turn the waste over</dd>
+      <dt>Finishing</dt><dd>Once every card is face up, the game plays the rest into the foundations by itself. Undo pauses this; a Finish button appears so you can restart it</dd>
+    </dl>
+    <h3>Keyboard</h3>
+    <dl class="keys">
+      <dt><kbd>←</kbd> <kbd>→</kbd> <kbd>↑</kbd> <kbd>↓</kbd></dt><dd>Move the cursor. Up and down also choose how deep in a column</dd>
+      <dt><kbd>Space</kbd> <kbd>Enter</kbd></dt><dd>Pick up the card under the cursor, then drop it on the pile under the cursor. Press again on the same card to send it to the best spot</dd>
+      <dt><kbd>1</kbd>–<kbd>0</kbd></dt><dd>Drop the picked-up cards on that column, or jump the cursor there</dd>
+      <dt><kbd>F</kbd></dt><dd>Send the card to a foundation</dd>
+      <dt><kbd>C</kbd></dt><dd>Send the card to a free cell (FreeCell)</dd>
+      <dt><kbd>D</kbd></dt><dd>Deal from the stock</dd>
+      <dt><kbd>A</kbd></dt><dd>Move every playable card to the foundations</dd>
+      <dt><kbd>U</kbd> <kbd>Ctrl Z</kbd> <kbd>Backspace</kbd></dt><dd>Undo</dd>
+      <dt><kbd>Esc</kbd></dt><dd>Put the picked-up card back</dd>
+      <dt><kbd>N</kbd></dt><dd>New game</dd>
+      <dt><kbd>T</kbd></dt><dd>Next deck</dd>
+      <dt><kbd>?</kbd> <kbd>H</kbd></dt><dd>This panel</dd>
+    </dl>
+    <div class="row-end"><button class="primary" type="button" data-close>Back to the game</button></div>
+  </div>
+</div>
+
+<div id="deckPanel" class="overlay" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="deckTitle">
+    <h2 id="deckTitle">Choose a deck</h2>
+    <p>Each deck changes the faces, the backs and the table. Your game stays where it is.</p>
+    <div class="decks" id="decks"></div>
+    <div class="row-end"><button type="button" data-close>Done</button></div>
+  </div>
+</div>
+
+<div id="win" class="overlay" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="winTitle">
+    <h2 id="winTitle">Solved</h2>
+    <p id="winLine"></p>
+    <p id="winStats" style="opacity:.75"></p>
+    <div class="row-end"><button type="button" data-close>Close</button><button id="wAgain" class="primary" type="button">Deal again</button></div>
+  </div>
+</div>
+
+<div id="toast" class="toast" role="status" hidden></div>
+<div id="live" class="sr" aria-live="polite"></div>
+
+<script>
+(() => {
+'use strict';
+
+/* ================= basics ================= */
+const SUIT_NAME = ['spades', 'hearts', 'diamonds', 'clubs'];
+const RANK = ['', 'A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+const RANK_NAME = ['', 'ace', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'jack', 'queen', 'king'];
+const red = s => s === 1 || s === 2;
+const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+const $ = id => document.getElementById(id);
+const range = n => Array.from({ length: n }, (_, i) => i);
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('qsol.' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem('qsol.' + k, JSON.stringify(v)); } catch {} },
+};
+const fmt = s => { const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, x = String(s % 60).padStart(2, '0'); return h ? `${h}:${String(m).padStart(2, '0')}:${x}` : `${m}:${x}`; };
+
+function deckOf(suitList) {
+  const d = [];
+  suitList.forEach(s => { for (let r = 1; r <= 13; r++) d.push({ id: d.length, s, r, up: false }); });
+  const rnd = new Uint32Array(d.length); crypto.getRandomValues(rnd);
+  for (let i = d.length - 1; i > 0; i--) { const j = rnd[i] % (i + 1); [d[i], d[j]] = [d[j], d[i]]; }
+  return d;
+}
+
+/* ================= decks (themes) ================= */
+// Every face is one SVG in a 100×140 box. Shared art lives in <symbol>s so 104 cards stay cheap.
+// The painterly look comes from three filters: "paint" (wobbled, softened edges plus brush grain),
+// "paper" (fine grain and mottling on the card stock) and "soft" blurs used for shading and glow.
+const f2 = n => +n.toFixed(2);
+const PL = 30, PC = 50, PR = 70;
+const PIPS = {
+  2: [[PC, 27], [PC, 113]], 3: [[PC, 27], [PC, 70], [PC, 113]],
+  4: [[PL, 27], [PR, 27], [PL, 113], [PR, 113]], 5: [[PL, 27], [PR, 27], [PC, 70], [PL, 113], [PR, 113]],
+  6: [[PL, 27], [PR, 27], [PL, 70], [PR, 70], [PL, 113], [PR, 113]],
+  7: [[PL, 27], [PR, 27], [PC, 48.5], [PL, 70], [PR, 70], [PL, 113], [PR, 113]],
+  8: [[PL, 27], [PR, 27], [PC, 48.5], [PL, 70], [PR, 70], [PC, 91.5], [PL, 113], [PR, 113]],
+  9: [[PL, 27], [PR, 27], [PL, 55.7], [PR, 55.7], [PC, 70], [PL, 84.3], [PR, 84.3], [PL, 113], [PR, 113]],
+  10: [[PL, 27], [PR, 27], [PC, 41.3], [PL, 55.7], [PR, 55.7], [PL, 84.3], [PR, 84.3], [PC, 98.7], [PL, 113], [PR, 113]],
+};
+const SUIT_PATH = [
+  'M50,4C76,28 96,44 96,63C96,77 86,85 74,85C64,85 57,80 53.5,73C54,84 58,91 67,97H33C42,91 46,84 46.5,73C43,80 36,85 26,85C14,85 4,77 4,63C4,44 24,28 50,4Z',
+  'M50,95C22,72 4,56 4,33C4,17 16,6 30,6C40,6 47,12 50,21C53,12 60,6 70,6C84,6 96,17 96,33C96,56 78,72 50,95Z',
+  'M50,3Q65,30 88,50Q65,70 50,97Q35,70 12,50Q35,30 50,3Z',
+  'M50,7A21,21 0 0 1 67.58,39.47A21,21 0 1 1 52.27,67.18C53,80 58,90 67,97H33C42,90 47,80 47.73,67.18A21,21 0 1 1 32.42,39.47A21,21 0 0 1 50,7Z',
+];
+const RUNES = 'ᚠᚢᚦᚨᚱᚲᚷᚹᚺᚾᛁᛃᛇᛈᛉᛊᛏᛒᛖᛗᛚᛜᛞᛟ';
+
+function spiro(cx, cy, Rr, r, d, sx, sy, turns, steps) {
+  let p = '';
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps * turns * 2 * Math.PI, k = (Rr - r) / r;
+    const x = (Rr - r) * Math.cos(t) + d * Math.cos(k * t), y = (Rr - r) * Math.sin(t) - d * Math.sin(k * t);
+    p += (i ? 'L' : 'M') + (cx + x * sx).toFixed(2) + ',' + (cy + y * sy).toFixed(2);
+  }
+  return p;
+}
+function star(cx, cy, Ro, Ri, n) {
+  let p = '';
+  for (let i = 0; i < n * 2; i++) {
+    const a = Math.PI * i / n - Math.PI / 2, rr = i % 2 ? Ri : Ro;
+    p += (i ? 'L' : 'M') + f2(cx + rr * Math.cos(a)) + ',' + f2(cy + rr * Math.sin(a));
+  }
+  return p + 'Z';
+}
+const polar = (cx, cy, r, deg) => [f2(cx + r * Math.cos(deg * Math.PI / 180)), f2(cy + r * Math.sin(deg * Math.PI / 180))];
+const qpt = (a, b, c, t) => [f2((1 - t) ** 2 * a[0] + 2 * (1 - t) * t * b[0] + t * t * c[0]), f2((1 - t) ** 2 * a[1] + 2 * (1 - t) * t * b[1] + t * t * c[1])];
+// Deterministic pseudo-random numbers so every card of a kind is painted the same way.
+const rng = seed => () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
+const SEP = '#3b2a1e';
+const ln = (w, c = SEP, o = .8) => `stroke="${c}" stroke-width="${w}" stroke-opacity="${o}" stroke-linejoin="round" stroke-linecap="round"`;
+const grad = (id, stops, attrs = 'x1="0" y1="0" x2="0" y2="1"') => `<linearGradient id="${id}" ${attrs}>${stops.map(([o, c, a]) => `<stop offset="${o}" stop-color="${c}"${a != null ? ` stop-opacity="${a}"` : ''}/>`).join('')}</linearGradient>`;
+const rgrad = (id, stops, attrs = 'cx=".5" cy=".5" r=".5"') => `<radialGradient id="${id}" ${attrs}>${stops.map(([o, c, a]) => `<stop offset="${o}" stop-color="${c}"${a != null ? ` stop-opacity="${a}"` : ''}/>`).join('')}</radialGradient>`;
+const GRAY = 'values=".33 .33 .33 0 0 .33 .33 .33 0 0 .33 .33 .33 0 0 0 0 0 0 1"';
+const contrast = (k, b) => `<feFuncR type="linear" slope="${k}" intercept="${b}"/><feFuncG type="linear" slope="${k}" intercept="${b}"/><feFuncB type="linear" slope="${k}" intercept="${b}"/>`;
+
+const GLOBAL_DEFS = SUIT_PATH.map((d, i) => `<symbol id="suit-${i}" viewBox="0 0 100 100" overflow="visible"><path d="${d}"/></symbol>`).join('') + `
+  <filter id="paint" x="-6%" y="-6%" width="112%" height="112%" color-interpolation-filters="sRGB">
+    <feTurbulence type="fractalNoise" baseFrequency=".075" numOctaves="2" seed="4" result="w"/>
+    <feDisplacementMap in="SourceGraphic" in2="w" scale="1.5" xChannelSelector="R" yChannelSelector="G" result="d"/>
+    <feGaussianBlur in="d" stdDeviation=".3" result="s"/>
+    <feTurbulence type="fractalNoise" baseFrequency=".8 .45" numOctaves="3" seed="9" result="n"/>
+    <feColorMatrix in="n" type="matrix" ${GRAY} result="g"/>
+    <feComponentTransfer in="g" result="g2">${contrast(1.45, -.22)}</feComponentTransfer>
+    <feBlend in="g2" in2="s" mode="soft-light" result="b"/>
+    <feComposite in="b" in2="s" operator="in"/>
+  </filter>
+  <filter id="paper" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+    <feTurbulence type="fractalNoise" baseFrequency=".95" numOctaves="2" seed="2" result="f"/>
+    <feTurbulence type="fractalNoise" baseFrequency=".03" numOctaves="3" seed="7" result="c"/>
+    <feComposite in="f" in2="c" operator="arithmetic" k2=".4" k3=".6" result="m"/>
+    <feColorMatrix in="m" type="matrix" ${GRAY} result="g"/>
+    <feComponentTransfer in="g" result="g2">${contrast(1.6, -.3)}</feComponentTransfer>
+    <feBlend in="g2" in2="SourceGraphic" mode="soft-light" result="b"/>
+    <feComposite in="b" in2="SourceGraphic" operator="in"/>
+  </filter>
+  <filter id="soft" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="1.1"/></filter>
+  <filter id="soft2" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="2.6"/></filter>
+  <filter id="me-glow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation=".8" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  <filter id="glow2" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="1.8" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  ${grad('g-goldV', [[0, '#fff3b8'], [.22, '#e9b63c'], [.5, '#9c6716'], [.72, '#f3d06a'], [1, '#a8731e']])}
+  ${grad('deco-gold', [[0, '#f8e6a6'], [.4, '#c9963a'], [.65, '#f4d88c'], [1, '#9a6c22']], 'x1="0" y1="0" x2="1" y2="1"')}
+  ${grad('me-gold', [[0, '#fff3c4'], [.3, '#e6b54f'], [.55, '#8a5713'], [.8, '#f7d97c'], [1, '#a26d1c']], 'x1="0" y1="0" x2="1" y2="1"')}
+  ${grad('g-silver', [[0, '#7f8a97'], [.42, '#f5f8fb'], [.58, '#c3ccd5'], [1, '#626d7a']], 'x1="0" y1="0" x2="1" y2="0"')}
+  ${grad('g-wood', [[0, '#5a3412'], [.45, '#a8702e'], [1, '#4a2a0e']], 'x1="0" y1="0" x2="1" y2="0"')}
+  ${grad('g-shadeX', [[0, '#000', .5], [.3, '#000', 0], [.7, '#000', 0], [1, '#000', .5]], 'x1="0" y1="0" x2="1" y2="0"')}
+  ${grad('g-shadeY', [[0, '#000', 0], [1, '#000', .38]])}
+  ${grad('g-sheen', [[.3, '#fff', 0], [.5, '#fff', .32], [.7, '#fff', 0]], 'x1="0" y1="0" x2="1" y2="0"')}
+  ${rgrad('g-skin', [[0, '#fff1e0'], [.55, '#f6d1ad'], [1, '#d69a74']], 'cx=".45" cy=".38" r=".72"')}
+  ${rgrad('g-ruby', [[0, '#ffb0a8'], [.4, '#d41c2e'], [1, '#5e0410']], 'cx=".35" cy=".32" r=".7"')}
+  ${rgrad('g-sapph', [[0, '#b8d4ff'], [.4, '#2557c8'], [1, '#0a1c50']], 'cx=".35" cy=".32" r=".7"')}
+  ${rgrad('g-emer', [[0, '#c4f7d2'], [.4, '#1f8a4a'], [1, '#06321a']], 'cx=".35" cy=".32" r=".7"')}
+  ${rgrad('g-pearl', [[0, '#ffffff'], [.6, '#ece6dc'], [1, '#9e9484']], 'cx=".35" cy=".32" r=".7"')}
+  ${rgrad('g-rose', [[0, '#ffb3ae'], [.5, '#d22a36'], [1, '#6e0914']], 'cx=".4" cy=".4" r=".65"')}
+  ${rgrad('g-leaf', [[0, '#9fd27a'], [1, '#22561f']], 'cx=".35" cy=".3" r=".8"')}
+  ${rgrad('g-panel', [[0, '#fffdf6'], [.7, '#f6ecd6'], [1, '#e6d4ad']], 'cx=".5" cy=".5" r=".72"')}
+  ${rgrad('me-parch', [[0, '#f8eed3'], [.55, '#eedcaf'], [.85, '#dcbd83'], [1, '#b98a4a']], 'cx=".5" cy=".45" r=".78"')}
+  ${rgrad('me-fire', [[.5, '#ff7a1a', 0], [.76, '#ff7a1a', .32], [1, '#ff7a1a', 0]])}
+  ${grad('cas-r', [[0, '#f04a59'], [1, '#9a0e1d']], 'x1=".2" y1="0" x2=".8" y2="1"')}
+  ${grad('cas-k', [[0, '#545864'], [1, '#09090c']], 'x1=".2" y1="0" x2=".8" y2="1"')}
+  ${grad('dec-r', [[0, '#e0544a'], [1, '#7e1a14']], 'x1=".2" y1="0" x2=".8" y2="1"')}
+  ${grad('dec-k', [[0, '#4a463f'], [1, '#080706']], 'x1=".2" y1="0" x2=".8" y2="1"')}
+  ${grad('me-r', [[0, '#c4382a'], [1, '#560c06']], 'x1=".2" y1="0" x2=".8" y2="1"')}
+  ${grad('me-k', [[0, '#6a4a2a'], [1, '#170e06']], 'x1=".2" y1="0" x2=".8" y2="1"')}
+  ${grad('cas-hair-13', [[0, '#b07a3a'], [1, '#5a3410']])}
+  ${grad('cas-hair-12', [[0, '#eeb860'], [1, '#9a5a12']])}
+  ${grad('cas-hair-11', [[0, '#f2c468'], [1, '#a8681c']])}
+  ${rgrad('dc-panel', [[0, '#3d362c'], [1, '#0d0c0a']], 'cx=".5" cy=".42" r=".7"')}
+  <radialGradient id="dc-ray" gradientUnits="userSpaceOnUse" cx="50" cy="64" r="78"><stop offset="0" stop-color="#f6dc8f" stop-opacity=".8"/><stop offset=".55" stop-color="#d4a94f" stop-opacity=".28"/><stop offset="1" stop-color="#d4a94f" stop-opacity="0"/></radialGradient>
+  ${rgrad('dc-skin', [[0, '#fbebd6'], [.6, '#efcfa8'], [1, '#b98a62']], 'cx=".46" cy=".36" r=".75"')}
+  ${grad('dc-hair', [[0, '#3c3a40'], [1, '#050505']])}
+  ${grad('me-banner', [[0, '#f3e0b0'], [.6, '#e0c287'], [1, '#bf9a5a']])}`;
+
+// A soft highlight on every pip gives it volume.
+const pipArt = (s, fillId, extra = '') => `<use href="#suit-${s}" fill="url(#${fillId})"${extra}/><use href="#suit-${s}" fill="#fff" opacity=".2" transform="translate(26,16) scale(.3)" filter="url(#soft)"/>`;
+const paperBg = (fill, extra = '') => `<g filter="url(#paper)"><rect width="100" height="140" fill="${fill}"/>${extra}</g>`;
+
+/* ---------- Casino: classic double-ended court figures ---------- */
+const CAS = { red: '#b81c2c', black: '#14161b', blue: '#1d3d93', cream: '#fcf8ee' };
+const casInk = s => red(s) ? CAS.red : CAS.black;
+const casGrad = s => red(s) ? 'cas-r' : 'cas-k';
+const casinoBg = () => paperBg(CAS.cream, `<rect width="100" height="140" fill="url(#g-panel)" opacity=".5"/>`) + `<rect x="2.5" y="2.5" width="95" height="135" rx="4.5" fill="none" stroke="#dccfae" stroke-width=".6"/>`;
+const casinoPip = s => pipArt(s, casGrad(s));
+function casinoAce(s) {
+  const col = casInk(s), sp = s === 0;
+  let petals = '', dots = '';
+  for (let i = 0; i < 16; i++) petals += `<path d="M50,40.5C53,37 53,34 50,30.5C47,34 47,37 50,40.5Z" transform="rotate(${i * 22.5} 50 70)"/>`;
+  for (let i = 0; i < 16; i++) petals += `<path d="M50,38C51.5,36 51.5,34.4 50,32.6C48.5,34.4 48.5,36 50,38Z" transform="rotate(${i * 22.5 + 11.25} 50 70)" opacity=".75"/>`;
+  for (let i = 0; i < 32; i++) { const [x, y] = polar(50, 70, 42, i * 11.25); dots += `<circle cx="${x}" cy="${y}" r="${i % 2 ? .55 : .9}"/>`; }
+  return `<circle cx="50" cy="70" r="30" fill="#fff6dc" opacity=".9" filter="url(#soft2)"/>
+    <circle cx="50" cy="70" r="28.5" fill="${sp ? '#fff7df' : 'none'}" stroke="${col}" stroke-width="1.3"/>
+    <circle cx="50" cy="70" r="26" fill="none" stroke="url(#g-goldV)" stroke-width="1.2"/>
+    <g fill="url(#g-goldV)" ${ln(.35, col, .7)}>${petals}</g>
+    ${sp ? `<path id="cas-arc" d="M11,70A39,39 0 0 1 89,70" fill="none"/><text font-size="6.4" letter-spacing="1.6" font-weight="700"><textPath href="#cas-arc" startOffset="50%" text-anchor="middle">QUIET · SOLITAIRE</textPath></text>
+      <path id="cas-arc2" d="M10,70A40,40 0 0 0 90,70" fill="none"/><text font-size="5.4" letter-spacing="2"><textPath href="#cas-arc2" startOffset="50%" text-anchor="middle">MMXXVI</textPath></text>` : `<g fill="${col}" opacity=".85">${dots}</g>`}
+    <use href="#suit-${s}" x="${sp ? 27 : 30}" y="${sp ? 49 : 52}" width="${sp ? 48 : 42}" height="${sp ? 48 : 42}" fill="#000" opacity=".25" filter="url(#soft)"/>
+    <g transform="translate(${sp ? 26 : 29} ${sp ? 46 : 49}) scale(${sp ? .48 : .42})">${pipArt(s, casGrad(s))}</g>
+    ${sp ? `<use href="#suit-0" x="43" y="59" width="14" height="14" fill="url(#g-goldV)"/><path d="M50,51V57.5 M44,68Q50,64 56,68 M46.5,77Q50,80 53.5,77" stroke="url(#g-goldV)" stroke-width=".9" fill="none"/>` : ''}`;
+}
+function casinoCourt(r, s) {
+  const sc = casInk(s), robeA = red(s) ? CAS.red : CAS.blue, robeB = robeA === CAS.red ? CAS.blue : CAS.red;
+  const hair = `url(#cas-hair-${r})`, hairDark = r === 13 ? '#5a3410' : '#9a5a12', hairLight = r === 13 ? '#c8904a' : '#ffd88a';
+  const eye = r === 13 ? '#5a3a1a' : r === 12 ? '#2f6aa8' : '#3c7a4a';
+  const robe = 'M22,72V61Q27,49 41,46.5H59Q73,49 78,61V72Z';
+  const quat = (x, y) => `<circle cx="${x - .6}" cy="${y}" r=".55"/><circle cx="${x + .6}" cy="${y}" r=".55"/><circle cx="${x}" cy="${y - .6}" r=".55"/><circle cx="${x}" cy="${y + .6}" r=".55"/>`;
+  const trimL = [[22.5, 64], [27, 53], [39, 49.5]], trimR = [[77.5, 64], [73, 53], [61, 49.5]];
+  let trim;
+  if (r === 13) {
+    const spots = [.18, .5, .82].flatMap(t => [qpt(...trimL, t), qpt(...trimR, t)]).map(([x, y]) => `<path d="M${x},${y - 1}q.8,1 0,2.1q-.8,-1.1 0,-2.1Z"/>`).join('');
+    trim = `<path d="M22.5,64Q27,53 39,49.5 M77.5,64Q73,53 61,49.5" stroke="#fbf8f1" stroke-width="5" fill="none" stroke-linecap="round"/>
+      <path d="M23.5,65Q28,55 39.5,51.5 M76.5,65Q72,55 60.5,51.5" stroke="#cfc6b6" stroke-width="1.4" fill="none" opacity=".7"/><g fill="#15130f">${spots}</g>`;
+  } else {
+    trim = `<path d="M22.5,64Q27,53 39,49.5 M77.5,64Q73,53 61,49.5" stroke="url(#g-goldV)" stroke-width="2.8" fill="none"/>
+      <path d="M22.5,64Q27,53 39,49.5 M77.5,64Q73,53 61,49.5" ${ln(.45, SEP, .6)} fill="none" stroke-dasharray="1 1.3"/>`;
+  }
+  const ruff = range(11).map(i => { const [x, y] = qpt([36.5, 47.5], [50, 57], [63.5, 47.5], i / 10); return `<circle cx="${x}" cy="${y}" r="1.75"/>`; }).join('');
+  const chain = r === 11 ? '' : range(9).map(i => { const [x, y] = qpt([39, 53], [50, 61.5], [61, 53], i / 8); return `<circle cx="${x}" cy="${y}" r=".6"/>`; }).join('');
+  const body = `<path d="${robe}" fill="${robeA}"/>
+    <g fill="#f3cf6c" opacity=".55">${[[27, 67], [32, 62.5], [68, 62.5], [73, 67], [29.5, 70.8], [70.5, 70.8], [36, 68], [64, 68]].map(([x, y]) => quat(x, y)).join('')}</g>
+    <path d="${robe}" fill="url(#g-shadeX)"/><path d="${robe}" fill="url(#g-shadeY)"/>
+    <path d="M28,72Q29,64 33,57 M34,72Q34.5,63 37.5,55 M66,72Q65.5,63 62.5,55 M72,72Q71,64 67,57" fill="none" stroke="#000" stroke-opacity=".3" stroke-width="1.2"/>
+    <path d="M30.6,72Q31.5,64 35,57 M69.4,72Q68.5,64 65,57" fill="none" stroke="#fff" stroke-opacity=".22" stroke-width=".9"/>
+    <path d="M43.5,47H56.5L58.5,72H41.5Z" fill="url(#g-goldV)"/><path d="M43.5,47H56.5L58.5,72H41.5Z" fill="url(#g-shadeX)" opacity=".7"/>
+    ${[52, 58, 64, 70].map(y => `<path d="M50,${y - 3.4}l2.6,3l-2.6,3l-2.6,-3Z" fill="${robeB}" ${ln(.35)}/><circle cx="50" cy="${y - .4}" r=".55" fill="#fff" opacity=".85"/>`).join('')}
+    <path d="M46.8,47H49.2L49.6,72H46.6Z" fill="#fff" opacity=".2"/>
+    ${trim}
+    <path d="M36.5,47.5Q50,57 63.5,47.5L61.5,45Q50,52.5 38.5,45Z" fill="#fbfaf4" ${ln(.4)}/><g fill="#fbfaf4" ${ln(.3, SEP, .6)}>${ruff}</g>
+    <path d="M38,49.5Q50,57.5 62,49.5" stroke="#bfb6a6" stroke-width=".8" fill="none" opacity=".6"/>
+    ${chain ? `<g fill="url(#g-goldV)">${chain}</g><use href="#suit-${s}" x="47.8" y="60" width="4.4" height="4.4" fill="url(#g-goldV)" ${ln(.25)}/>` : ''}`;
+  let back, front, hat, item;
+  if (r === 13) {
+    back = `<path d="M41,27Q39.5,34 41,38L42.5,30Z M59,27Q60.5,34 59,38L57.5,30Z" fill="${hair}"/>`;
+    front = `<path d="M40.5,31Q40,45 50,50.5Q60,45 59.5,31Q58,39 50,40Q42,39 40.5,31Z" fill="${hair}" ${ln(.45)}/>
+      <path d="M43,36Q44,43 47,47.5 M45.5,38.5Q46.8,45 49,49 M54.5,38.5Q53.2,45 51,49 M57,36Q56,43 53,47.5 M50,40.5V49.5 M41.6,34Q42,40 44.5,44 M58.4,34Q58,40 55.5,44" stroke="${hairLight}" stroke-width=".35" opacity=".75" fill="none"/>
+      <path d="M44.4,38.4Q47.5,36.2 50,37.5Q52.5,36.2 55.6,38.4Q52.5,39.7 50,38.9Q47.5,39.7 44.4,38.4Z" fill="${hairDark}" ${ln(.3)}/>
+      <path d="M45.5,38.2Q47.5,37.2 49.5,37.9" stroke="${hairLight}" stroke-width=".3" fill="none"/>`;
+    hat = `<path d="M41,25Q41,14 50,13.5Q59,14 59,25Z" fill="${robeB}"/><path d="M41,25Q41,14 50,13.5Q59,14 59,25Z" fill="url(#g-shadeX)"/>
+      <path d="M40,26L39,15L44,20L47,12L50,19L53,12L56,20L61,15L60,26Z" fill="url(#g-goldV)" ${ln(.5)}/>
+      <path d="M40.6,25L40,16.5L44,20.5 M47,13L49.2,18.5" stroke="#fff" stroke-width=".4" opacity=".6" fill="none"/>
+      ${[[39, 15], [47, 12], [53, 12], [61, 15]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="1.15" fill="url(#g-pearl)" ${ln(.25)}/>`).join('')}
+      <rect x="39.5" y="24" width="21" height="3.6" rx=".6" fill="url(#g-goldV)" ${ln(.45)}/>
+      <path d="M41,25.8H59" stroke="#7a5212" stroke-width=".3" stroke-dasharray=".5 .7"/>
+      <circle cx="50" cy="25.8" r="1.6" fill="url(#g-ruby)" ${ln(.25)}/><circle cx="44.5" cy="25.8" r="1.1" fill="url(#g-sapph)"/><circle cx="55.5" cy="25.8" r="1.1" fill="url(#g-sapph)"/>
+      <circle cx="50" cy="20" r="1.3" fill="url(#g-emer)" ${ln(.25)}/>`;
+    item = `<path d="M69.8,16.5L71,13L72.2,16.5V58.5H69.8Z" fill="url(#g-silver)" ${ln(.3)}/><path d="M71,17V57.5" stroke="#5b6672" stroke-width=".35"/>
+      <rect x="65.4" y="58.3" width="11.2" height="2.4" rx="1.2" fill="url(#g-goldV)" ${ln(.3)}/>
+      <rect x="70" y="60.7" width="2" height="7" fill="#5a3418"/><path d="M70,62.2L72,61.4 M70,64.2L72,63.4 M70,66.2L72,65.4" stroke="#c89a5a" stroke-width=".35"/>
+      <circle cx="71" cy="68.6" r="1.5" fill="url(#g-ruby)" ${ln(.25)}/>`;
+  } else if (r === 12) {
+    back = `<path d="M41.5,24Q35.5,30 34,47L40,45Q39,34 42.2,27Z M58.5,24Q64.5,30 66,47L60,45Q61,34 57.8,27Z" fill="#fff" opacity=".4"/>
+      <path d="M40,26Q36,40 31,55Q36,56.5 42,52Q40.5,40 42,30Z M60,26Q64,40 69,55Q64,56.5 58,52Q59.5,40 58,30Z" fill="${hair}" ${ln(.4)}/>
+      <path d="M39,31Q36.5,42 33,53 M41,33Q39,43 36.5,54 M61,31Q63.5,42 67,53 M59,33Q61,43 63.5,54" stroke="${hairLight}" stroke-width=".4" opacity=".7" fill="none"/>`;
+    front = `<path d="M41.5,28Q43,21.8 50,21.5Q57,21.8 58.5,28Q55,24.5 50,25Q45,24.5 41.5,28Z" fill="${hair}" ${ln(.35)}/>
+      <path d="M44,26.5Q46.5,23.5 50,23.4 M56,26.5Q53.5,23.5 50,23.4" stroke="${hairLight}" stroke-width=".35" fill="none"/>`;
+    hat = `<path d="M41.5,25L41.5,18L45.5,21.5L50,15.5L54.5,21.5L58.5,18L58.5,25Z" fill="url(#g-goldV)" ${ln(.5)}/>
+      ${[42, 46, 50, 54, 58].map(x => `<circle cx="${x}" cy="25.6" r="1.15" fill="url(#g-pearl)" ${ln(.25)}/>`).join('')}
+      <circle cx="50" cy="20.5" r="1.4" fill="url(#g-${red(s) ? 'sapph' : 'ruby'})" ${ln(.25)}/>
+      ${[[41.5, 18], [50, 15.5], [58.5, 18]].map(([x, y]) => `<circle cx="${x}" cy="${y - .6}" r=".8" fill="url(#g-pearl)"/>`).join('')}`;
+    const petals = range(7).map(i => `<ellipse cx="30" cy="34.6" rx="2.6" ry="3.8" transform="rotate(${i * 51.4} 30 38.4)" fill="url(#g-rose)" ${ln(.3, '#5a0810', .6)}/>`).join('');
+    item = `<path d="M29.4,66Q30.6,52 30,41" stroke="#2f6b33" stroke-width="1.5" fill="none"/>
+      <path d="M30,54q-7,-2 -8,-8q7,0 8,8Z M30.4,58q6,-1.6 8,-6.6q-6.4,.4 -8,6.6Z" fill="url(#g-leaf)" ${ln(.3, '#1d3f1f', .7)}/>
+      <path d="M30,54L24,47.5 M30.4,58L37.4,52" stroke="#c8e6a8" stroke-width=".3" opacity=".8"/>
+      ${petals}<circle cx="30" cy="38.4" r="2.6" fill="url(#g-rose)"/><path d="M28.6,38.6Q30,36.6 31.4,38.4Q30,40 29,38.9" stroke="#5a0810" stroke-width=".4" fill="none"/>`;
+  } else {
+    back = `${[[41.2, 30], [40.8, 33.4], [41.6, 36.6], [58.8, 30], [59.2, 33.4], [58.4, 36.6]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="1.8" fill="${hair}" ${ln(.3)}/><path d="M${x - .8},${y}q.8,-1 1.6,0" stroke="${hairLight}" stroke-width=".3" fill="none"/>`).join('')}`;
+    front = `<path d="M42,27Q44,23.5 50,23.4Q56,23.5 58,27Q54,25.5 50,26Q46,25.5 42,27Z" fill="${hair}"/>`;
+    const barbs = range(9).map(i => { const [x, y] = qpt([43, 22], [36, 11], [30, 12.6], i / 8); return `<path d="M${x},${y}l-1.6,-2.2 M${x},${y}l1.8,-.6" stroke="#cfc6b6" stroke-width=".3"/>`; }).join('');
+    hat = `<path d="M39,27Q39,16 51,15.5Q61,16 61.5,25L63,27Z" fill="${robeB}" ${ln(.6)}/><path d="M39,27Q39,16 51,15.5Q61,16 61.5,25L63,27Z" fill="url(#g-shadeX)"/>
+      <path d="M44,17.5Q50,15.8 56,17.6" stroke="#fff" stroke-width=".7" opacity=".3" fill="none"/>
+      <path d="M39,26.4H63V28.2H39Z" fill="url(#g-goldV)"/><circle cx="51" cy="27.3" r="1" fill="url(#g-emer)"/>
+      <path d="M44,21Q35,9.5 30,12.6Q34.6,16 42,24.5Z" fill="#fffdf6" ${ln(.45)}/>${barbs}`;
+    item = `<rect x="70.1" y="17" width="1.8" height="50" fill="url(#g-wood)"/><path d="M70.6,22V64" stroke="#d9a868" stroke-width=".25" opacity=".7"/>
+      <path d="M71,21Q78.5,22.5 79.5,30.5Q75,27.5 71,28.5Z" fill="url(#g-silver)" ${ln(.4)}/><path d="M71,21Q65,23 64,28L71,26.4Z" fill="url(#g-silver)" ${ln(.4)}/>
+      <path d="M71,12.5L69.3,17.5H72.7Z" fill="url(#g-silver)" ${ln(.4)}/><path d="M71,29.5q-1.6,3 -.4,6 M71,29.5q1.6,3 .4,6" stroke="${CAS.red}" stroke-width=".9" fill="none"/>`;
+  }
+  const head = `${back}
+    <ellipse cx="41.1" cy="32.6" rx="1.4" ry="2.3" fill="#efbf98" ${ln(.35)}/><ellipse cx="58.9" cy="32.6" rx="1.4" ry="2.3" fill="#efbf98" ${ln(.35)}/>
+    <path d="M46,39H54V48H46Z" fill="url(#g-skin)" ${ln(.45)}/><ellipse cx="50" cy="42.6" rx="4.4" ry="1.7" fill="#7a3a1a" opacity=".32" filter="url(#soft)"/>
+    <ellipse cx="50" cy="32" rx="9" ry="10.5" fill="url(#g-skin)" ${ln(.55)}/>
+    <circle cx="45" cy="35.4" r="2" fill="#e8847a" opacity=".45" filter="url(#soft)"/><circle cx="55" cy="35.4" r="2" fill="#e8847a" opacity=".45" filter="url(#soft)"/>
+    <path d="M50.7,31.6Q51.5,34.4 51,36" stroke="#c98a66" stroke-width="1" opacity=".55" filter="url(#soft)"/>
+    ${[46.6, 53.4].map(x => `<ellipse cx="${x}" cy="31.5" rx="1.75" ry="1.05" fill="#fff"/><circle cx="${x + .2}" cy="31.55" r=".82" fill="${eye}"/><circle cx="${x + .2}" cy="31.55" r=".38" fill="#111"/><circle cx="${x + .5}" cy="31.2" r=".22" fill="#fff"/>
+      <path d="M${x - 1.8},31.2Q${x},29.9 ${x + 1.8},31.2" ${ln(.55)} fill="none"/><path d="M${x - 1.4},32.5Q${x},33 ${x + 1.4},32.5" ${ln(.25, SEP, .4)} fill="none"/>`).join('')}
+    <path d="M44.6,29Q46.6,27.7 48.6,28.6 M51.4,28.6Q53.4,27.7 55.4,29" stroke="${hairDark}" stroke-width=".75" fill="none" stroke-linecap="round"/>
+    <path d="M50,31.6Q49.3,34.4 48.6,35.6Q49.6,36.3 50.8,35.9" fill="none" ${ln(.4, SEP, .6)}/>
+    ${r === 13 ? '' : `<path d="M47.6,38.2Q48.8,37.4 50,37.9Q51.2,37.4 52.4,38.2Q50,39.8 47.6,38.2Z" fill="#c4484a"/><path d="M48.6,38.75Q50,39.3 51.4,38.75" stroke="#fff" stroke-opacity=".4" stroke-width=".3" fill="none"/>`}
+    ${front}`;
+  const half = body + head + hat + item, id = `cc${r}${s}`;
+  return `<clipPath id="${id}"><rect x="17.5" y="14.5" width="65" height="111"/></clipPath>
+    <rect x="17" y="14" width="66" height="112" fill="url(#g-panel)" stroke="${sc}" stroke-width="1.2"/>
+    <rect x="18.7" y="15.7" width="62.6" height="108.6" fill="none" stroke="#c9a042" stroke-width=".4"/>
+    <g clip-path="url(#${id})"><g transform="translate(0,1)">${half}</g><g transform="rotate(180 50 70) translate(0,1)">${half}</g>
+      <rect x="17" y="66" width="66" height="8" fill="#000" opacity=".12" filter="url(#soft)"/></g>
+    <path d="M17.5,70H82.5" stroke="${sc}" stroke-width="1.1"/>
+    <use href="#suit-${s}" x="19.6" y="16.6" width="9" height="9" fill="url(#${casGrad(s)})"/><use href="#suit-${s}" x="19.6" y="16.6" width="9" height="9" fill="url(#${casGrad(s)})" transform="rotate(180 50 70)"/>`;
+}
+function casinoBack() {
+  let rose = '';
+  for (let i = 0; i < 24; i++) rose += `<ellipse cx="50" cy="70" rx="15" ry="5" transform="rotate(${i * 7.5} 50 70)"/>`;
+  const corner = (cx, cy) => { let s = ''; for (let i = 0; i < 12; i++) s += `<ellipse cx="${cx}" cy="${cy}" rx="7" ry="2.5" transform="rotate(${i * 15} ${cx} ${cy})"/>`; return s; };
+  let beads = '';
+  for (let x = 14; x <= 86; x += 6) beads += `<path d="M${x},6.3l1.6,1.6l-1.6,1.6l-1.6,-1.6Z M${x},130.5l1.6,1.6l-1.6,1.6l-1.6,-1.6Z"/>`;
+  for (let y = 16; y <= 124; y += 6) beads += `<path d="M7.9,${y}l1.6,1.6l-1.6,1.6l-1.6,-1.6Z M92.1,${y}l1.6,1.6l-1.6,1.6l-1.6,-1.6Z"/>`;
+  return `<defs>
+    <pattern id="cs-hatch" width="2.4" height="2.4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="2.4" height="2.4" fill="#7a0d1e"/><rect width="1" height="2.4" fill="#9c1a2e"/></pattern>
+    ${rgrad('cs-glow', [[0, '#e0485e', .9], [1, '#e0485e', 0]], 'cx=".5" cy=".5" r=".55"')}</defs>
+    <rect width="100" height="140" rx="7" fill="#f7f2e6"/>
+    <g filter="url(#paint)">
+    <rect x="4" y="4" width="92" height="132" rx="3.5" fill="url(#cs-hatch)"/>
+    <rect x="4" y="4" width="92" height="132" rx="3.5" fill="url(#cs-glow)"/>
+    <rect x="4" y="4" width="92" height="132" rx="3.5" fill="url(#g-shadeX)" opacity=".5"/>
+    <g fill="url(#g-goldV)">${beads}</g>
+    <rect x="11" y="11" width="78" height="118" rx="2" fill="none" stroke="#f0d590" stroke-width=".9"/>
+    <rect x="13" y="13" width="74" height="114" rx="1.5" fill="none" stroke="#f0d590" stroke-width=".35"/>
+    <path d="${spiro(50, 70, 8, 3, 5, 3.4, 4.7, 3, 720)}" fill="none" stroke="#f3d68a" stroke-width=".6"/>
+    <path d="${spiro(50, 70, 10, 3, 2.2, 2.5, 3.3, 3, 540)}" fill="none" stroke="#fff4dc" stroke-width=".42" opacity=".9"/>
+    <g fill="none" stroke="#f3d68a" stroke-width=".35">${rose}</g>
+    <g fill="none" stroke="#f3d68a" stroke-width=".38">${corner(20, 21)}${corner(80, 21)}${corner(20, 119)}${corner(80, 119)}</g>
+    <circle cx="50" cy="70" r="13" fill="#ffe9b0" opacity=".5" filter="url(#soft2)"/>
+    <circle cx="50" cy="70" r="10.5" fill="#f7f2e6" stroke="url(#g-goldV)" stroke-width="1.6"/>
+    <use href="#suit-0" x="47" y="60.6" width="6" height="6" fill="url(#cas-k)"/><use href="#suit-1" x="53.6" y="67" width="6" height="6" fill="url(#cas-r)"/>
+    <use href="#suit-3" x="47" y="73.4" width="6" height="6" fill="url(#cas-k)"/><use href="#suit-2" x="40.4" y="67" width="6" height="6" fill="url(#cas-r)"/></g>`;
+}
+
+/* ---------- Art Deco: crisp poster style (flat color, hard light/shadow facets, gold speed lines) ---------- */
+// No paint or paper filters here: Deco wants hard edges. Faceting splits a shape down the middle
+// into a lit half and a shadow half, the way Cassandre and Erté posters model form.
+const DEC = { red: '#c4322a', redD: '#86191a', black: '#141311', blackL: '#3b3833', cream: '#f4ead2', jade: '#1f7364', jadeD: '#114538', skin: '#f2dcc0', skinD: '#c99c74' };
+const GD = 'url(#deco-gold)';
+const DEC_DEFS = `<clipPath id="dc-half" clipPathUnits="objectBoundingBox"><rect x=".5" y="-.1" width=".6" height="1.2"/></clipPath>`;
+const decSuit = s => red(s) ? [DEC.red, DEC.redD] : [DEC.blackL, DEC.black];
+const facet = (el, light, dark, extra = '') => `${el.replace('FILL', light).replace('EXTRA', extra)}${el.replace('FILL', dark).replace('EXTRA', '')
+  .replace('/>', ' clip-path="url(#dc-half)"/>')}`;
+const DEC_FRAME = 'M19.4,6.2H80.6V37.4H84.2V102.6H80.6V133.8H19.4V102.6H15.8V37.4H19.4Z';
+// Picture cards skip the stepped inner frame: their ziggurat panel is the frame there.
+// The court variant skips <defs>: it always renders alongside a non-court background in the
+// same SVG document, and duplicate ids across variants would leave stray definitions.
+const decoBg = (court) => `${court ? '' : `<defs>${DEC_DEFS}<clipPath id="dc-frame"><path d="${DEC_FRAME}"/></clipPath></defs>`}<rect width="100" height="140" fill="${DEC.cream}"/>
+  <rect x="2.6" y="2.6" width="94.8" height="134.8" rx="2.5" fill="none" stroke="${GD}" stroke-width="1.4"/>
+  ${court ? '' : `<path d="${DEC_FRAME}" fill="none" stroke="${DEC.black}" stroke-width=".45"/>
+  <g fill="${GD}"><rect x="16.4" y="36.2" width="2.4" height="2.4"/><rect x="81.2" y="36.2" width="2.4" height="2.4"/><rect x="16.4" y="101.4" width="2.4" height="2.4"/><rect x="81.2" y="101.4" width="2.4" height="2.4"/></g>`}
+  <path d="M40,2.6L50,9L60,2.6 M40,137.4L50,131L60,137.4" fill="none" stroke="${GD}" stroke-width="1.1"/>
+  <g fill="${GD}"><path d="M2.6,62L5.4,64V76L2.6,78Z"/><path d="M97.4,62L94.6,64V76L97.4,78Z"/></g>`;
+const decoPip = s => { const [l, d] = decSuit(s); return `<use href="#suit-${s}" fill="${l}" stroke="${GD}" stroke-width="7" paint-order="stroke"/><use href="#suit-${s}" fill="${d}" clip-path="url(#dc-half)"/>`; };
+function decoAce(s) {
+  let rays = '';
+  for (let i = 0; i < 40; i++) {
+    const a = i * 9, r2 = i % 2 ? 40 : 50;
+    const [x1, y1] = polar(50, 70, 26, a - 2.6), [x2, y2] = polar(50, 70, r2, a), [x3, y3] = polar(50, 70, 26, a + 2.6);
+    rays += `<path d="M${x1},${y1}L${x2},${y2}L${x3},${y3}Z"${i % 2 ? '' : ` fill="${DEC.black}"`}/>`;
+  }
+  const step = 'M50,38L56,44H62V50L68,56V62L74,70L68,78V84L62,90V96H56L50,102L44,96H38V90L32,84V78L26,70L32,62V56L38,50V44H44Z';
+  const [l, d] = decSuit(s);
+  return `<g clip-path="url(#dc-frame)" fill="${GD}">${rays}</g>
+    <path d="${step}" fill="${DEC.black}" stroke="${GD}" stroke-width="1.6"/>
+    <circle cx="50" cy="70" r="20" fill="${DEC.cream}" stroke="${GD}" stroke-width="2"/>
+    <circle cx="50" cy="70" r="17" fill="none" stroke="${DEC.black}" stroke-width=".6"/>
+    <path d="M19,66H30 M19,70H30 M19,74H30 M70,66H81 M70,70H81 M70,74H81" stroke="${DEC.black}" stroke-width="1"/>
+    <g transform="translate(37 57) scale(.26)"><use href="#suit-${s}" fill="${red(s) ? l : DEC.black}" stroke="${GD}" stroke-width="8" paint-order="stroke"/><use href="#suit-${s}" fill="${red(s) ? d : '#000'}" clip-path="url(#dc-half)"/></g>`;
+}
+function decoCourt(r, s) {
+  const [cl, cd] = red(s) ? [DEC.red, DEC.redD] : [DEC.jade, DEC.jadeD], ink = DEC.black, id = `dc${r}${s}`;
+  const panel = 'M18,127V38H23V30H30V24H39V19H61V24H70V30H77V38H82V127Z';
+  const inner = ['M21,127V41H26V33H33V27H42V22H58V27H67V33H74V41H79V127', 'M24,127V44H29V36H36V30H45V25H55V30H64V36H71V44H76V127'];
+  let rays = '';
+  for (let i = 0; i < 48; i += 2) {
+    const [x1, y1] = polar(50, 66, 95, i * 7.5), [x2, y2] = polar(50, 66, 95, i * 7.5 + 3.2);
+    rays += `<path d="M50,66L${x1},${y1}L${x2},${y2}Z"/>`;
+  }
+  const g = w => `stroke="${GD}" stroke-width="${w}"`, k = w => `stroke="${ink}" stroke-width="${w}"`;
+  const coat = `<path d="M20,127V108L36,90H64L80,108V127Z" fill="FILL"/>`;
+  const shoulders = `${facet(coat, cl, cd)}
+    <path d="M20,108L36,90H64L80,108" fill="none" ${g(1.4)}/>
+    ${[0, 5, 10].map(o => `<path d="M${30 + o},${100 + o}L50,${118 + o * .4}L${70 - o},${100 + o}" fill="none" ${g(1)}/>`).join('')}
+    <path d="M40,90L50,108L46,90Z" fill="${ink}"/><path d="M60,90L50,108L54,90Z" fill="${ink}"/>
+    <path d="M40,90L50,108L60,90" fill="none" ${g(1.2)}/>
+    <use href="#deco-pip-${s}" x="44.5" y="113" width="11" height="11"/>`;
+  const collar = r === 12 ? (() => {
+    let l = ''; for (let a = 186; a <= 354; a += 12) { const [x, y] = polar(50, 92, 22, a); l += `M50,92L${x},${y}`; }
+    return `<path d="M28,92A22,22 0 0 1 72,92Z" fill="${GD}"/><path d="${l}" ${k(.7)}/><path d="M28,92A22,22 0 0 1 72,92Z" fill="none" ${k(.8)}/>`;
+  })() : '';
+  // Men get a squarer jaw, open eyes under heavy brows and no lipstick; the queen keeps the
+  // narrow face, closed lids and red lips.
+  const male = r !== 12;
+  const faceShape = male
+    ? `<path d="M50,47L58.6,49.6L61.6,57.4L61,68L57.4,77L50,80.4L42.6,77L39,68L38.4,57.4L41.4,49.6Z" fill="FILL"/>`
+    : `<path d="M50,47L58.5,50.5L61.5,59L60,69L54,79L50,81.5L46,79L40,69L38.5,59L41.5,50.5Z" fill="FILL"/>`;
+  const neck = `<path d="M45,76H55V91H45Z" fill="FILL"/>`;
+  const eyes = male
+    ? [45.2, 54.8].map(x => `<path d="M${x - 2.8},62Q${x},60 ${x + 2.8},62Q${x},63.4 ${x - 2.8},62Z" fill="#fbf6ee"/><circle cx="${x}" cy="61.9" r="1" fill="#2c2a26"/>
+        <path d="M${x - 3},62Q${x},59.7 ${x + 3},62" fill="none" ${k(.9)}/>`).join('')
+      + `<path d="M41.4,58.8L48.4,57.2L48.6,58.6L41.6,59.9Z M58.6,58.8L51.6,57.2L51.4,58.6L58.4,59.9Z" fill="${ink}"/>`
+    : `<path d="M42.4,62.4Q45.2,59.6 48,62.4" fill="none" ${k(1.4)}/><path d="M52,62.4Q54.8,59.6 57.6,62.4" fill="none" ${k(1.4)}/>
+       <path d="M42,57.6L48,56.4 M52,56.4L58,57.6" ${k(.7)}/>`;
+  const head = `<circle cx="50" cy="62" r="23" fill="none" ${g(.6)}/><circle cx="50" cy="62" r="26" fill="none" ${g(.3)}/>
+    ${facet(neck, DEC.skin, DEC.skinD)}<path d="M45,80L50,84L55,80" fill="none" ${k(.4)} opacity=".6"/>
+    ${facet(faceShape, DEC.skin, DEC.skinD)}
+    ${eyes}
+    <path d="M50,59.5V69.4L48.2,69.8" fill="none" ${k(.6)}/>`;
+  const lips = `<path d="M46.6,74L48.6,72.6L50,73.4L51.4,72.6L53.4,74L50,76Z" fill="${DEC.red}"/><path d="M50,73.4V76L53.4,74L51.4,72.6Z" fill="${DEC.redD}"/>`;
+  const speed = (paths, w = .55) => `<path d="${paths}" fill="none" ${g(w)}/>`;
+  let top;
+  if (r === 13) top = `<path d="M48.2,75.4H51.8" ${k(.6)}/>
+    <path d="M39.4,69L43,74.6Q50,77.6 57,74.6L60.6,69L61.2,76L57.8,81V85L53.8,88.6H46.2L42.2,85V81L38.8,76Z" fill="${ink}"/>
+    <path d="M44,81.4L50,84.8L56,81.4" fill="none" ${g(.5)}/>
+    <path d="M43.6,72.6Q47,70.6 50,71.8Q53,70.6 56.4,72.6Q56,74 54.6,73.6Q52,72.6 50,73.4Q48,72.6 45.4,73.6Q44,74 43.6,72.6Z" fill="${ink}"/>
+    <path d="M38,54V43H42V37H46V31H54V37H58V43H62V54Z" fill="${GD}"/><path d="M50,31H54V37H58V43H62V54H50Z" fill="#000" opacity=".22"/>
+    <path d="M38,49H62 M46,37V54 M54,37V54" ${k(.6)}/>
+    <path d="M50,39.4L52.8,43.4L50,47.4L47.2,43.4Z" fill="${cl}" ${k(.4)}/><path d="M50,39.4L52.8,43.4L50,47.4Z" fill="${cd}"/>`;
+  else if (r === 12) top = `${lips}<path d="M36,73V55L40,45L50,41L60,45L64,55V73H58.6V57L55,52.6H45L41.4,57V73Z" fill="${ink}"/>
+    ${speed('M38.4,70V56L42,47.4L50,44.2L58,47.4L61.6,56V70 M40.6,68V57L43.6,50L50,47.2L56.4,50L59.4,57V68')}
+    <path d="M36.6,51.4L50,47.4L63.4,51.4" fill="none" ${g(2.4)}/>
+    <path d="M60,49L57,40 M60,49L60,39 M60,49L63,40 M60,49L67,43" ${g(1.3)}/><path d="M60,49L62,51L60,53L58,51Z" fill="${cl}" ${g(.4)}/>
+    <path d="M38.4,73L37,84L39.8,84Z M61.6,73L60.2,84L63,84Z" fill="${GD}"/>`;
+  else top = `<path d="M45.8,72.6Q48,71.5 50,72.2Q52,71.5 54.2,72.6" fill="none" ${k(.85)}/>
+    <path d="M47.6,74.9Q50,75.5 52.4,74.9" fill="none" ${k(.6)}/><path d="M48.4,76.2H51.6" stroke="${DEC.skinD}" stroke-width=".8"/>
+    <path d="M47.4,79.2Q50,80 52.6,79.2" fill="none" stroke="${DEC.skinD}" stroke-width=".6"/>
+    <path d="M38.5,57.4L41.6,56.6V64.6L39.2,63.4Z M61.5,57.4L58.4,56.6V64.6L60.8,63.4Z" fill="${ink}"/>
+    <path d="M39.2,54L41.4,51H58.6L60.8,54L57.6,55.2H42.4Z" fill="${ink}"/>
+    <path d="M40.6,50.8L41.6,32H58.4L59.4,50.8Z" fill="${ink}"/>
+    <path d="M40.9,45.6H59.1V48.4H40.9Z" fill="${GD}"/>
+    <path d="M35.4,50.4H64.6L63,53H37Z" fill="${ink}"/><path d="M35.4,50.4H64.6" ${g(.6)}/>
+    ${speed('M43.4,34V45 M45.6,34V45', .4)}
+    <path d="M43.5,87.5L50,91L43.5,94.5Z M56.5,87.5L50,91L56.5,94.5Z" fill="${GD}" ${k(.4)}/><path d="M48.8,89.8H51.2V92.2H48.8Z" fill="${ink}"/>
+    <path d="M30,97L25,106H29.6L26,116L33,104H28.6L32,97Z M70,97L75,106H70.4L74,116L67,104H71.4L68,97Z" fill="${GD}"/>`;
+  return `<clipPath id="${id}"><path d="${panel}"/></clipPath>
+    <path d="${panel}" fill="${ink}"/>
+    <g clip-path="url(#${id})"><g fill="${GD}" opacity=".55">${rays}</g>
+      ${inner.map(p => `<path d="${p}" fill="none" ${g(.5)}/>`).join('')}
+      ${shoulders}${collar}${head}${top}</g>
+    <path d="${panel}" fill="none" ${g(1.6)}/>
+    <path d="M44,19V15H56V19" fill="none" ${g(.9)}/><path d="M48,15V12H52V15" fill="none" ${g(.9)}/>`;
+}
+function decoBack() {
+  let rays = '';
+  for (let i = 0; i < 48; i += 2) {
+    const [x1, y1] = polar(50, 70, 130, i * 7.5), [x2, y2] = polar(50, 70, 130, i * 7.5 + 4);
+    rays += `<path d="M50,70L${x1},${y1}L${x2},${y2}Z"/>`;
+  }
+  let arcs = '';
+  for (const r of [4, 8, 12, 16]) arcs += `<path d="M${50 - r},10A${r},${r} 0 0 0 ${50 + r},10"/><path d="M${50 - r},130A${r},${r} 0 0 1 ${50 + r},130"/>`;
+  const chev = x => { const d = x < 50 ? 1 : -1; let s = ''; for (const o of [0, 4, 8]) s += `M${x + o * d},62l${6 * d},8l${-6 * d},8 `; return s; };
+  return `<defs><clipPath id="dc-clip"><rect x="7" y="7" width="86" height="126"/></clipPath></defs>
+    <rect width="100" height="140" rx="7" fill="#0f0e0c"/>
+    <g clip-path="url(#dc-clip)" fill="${GD}" opacity=".5">${rays}</g>
+    <rect x="4" y="4" width="92" height="132" rx="4" fill="none" stroke="${GD}" stroke-width="1.3"/>
+    <rect x="7" y="7" width="86" height="126" fill="none" stroke="${GD}" stroke-width=".5"/>
+    <g fill="${GD}"><rect x="5.6" y="5.6" width="3" height="3"/><rect x="91.4" y="5.6" width="3" height="3"/><rect x="5.6" y="131.4" width="3" height="3"/><rect x="91.4" y="131.4" width="3" height="3"/></g>
+    <g fill="none" stroke="${GD}" stroke-width=".8">${arcs}<path d="M50,26V32 M50,108V114"/><path d="${chev(12)}${chev(88)}"/></g>
+    <path d="M50,32L79,70L50,108L21,70Z" fill="#0f0e0c" stroke="${GD}" stroke-width="1.6"/>
+    <path d="M50,40L73,70L50,100L27,70Z" fill="none" stroke="${GD}" stroke-width=".6"/>
+    <path d="M50,48L66.5,70L50,92L33.5,70Z" fill="${GD}"/><path d="M50,48L66.5,70L50,92Z" fill="#000" opacity=".25"/>
+    <path d="M50,56L60.5,70L50,84L39.5,70Z" fill="#0f0e0c"/>
+    <path d="M50,62L56,70L50,78L44,70Z" fill="${GD}"/><path d="M50,62L56,70L50,78Z" fill="#000" opacity=".25"/>`;
+}
+
+/* ---------- Four Realms: painted realm scenes in arched windows ---------- */
+const ME = { red: '#901c12', black: '#2b1c10', umber: '#5a3a18', gilt: '#d9b56a' };
+const meGrad = s => red(s) ? 'me-r' : 'me-k';
+const REALMS = [
+  { top: '#3a4468', bot: '#0d1020', fg: '#f2f1ea' },   // ♠ the Star Kingdom
+  { top: '#3f8890', bot: '#0d262c', fg: '#e8cc72' },   // ♥ the Silver Wood
+  { top: '#3f6a8c', bot: '#e8a85a', fg: '#f6efda' },   // ♦ the Horse Plains
+  { top: '#8fc6e2', bot: '#e8f3f2', fg: '#2f6b33' },   // ♣ the Hill Country
+];
+const ringBg = () => paperBg('url(#me-parch)', `<g fill="none" stroke="#9c7a44" stroke-width=".35" opacity=".5"><path d="M6,40Q28,30 46,42T94,38"/><path d="M6,46Q28,36 46,48T94,44" stroke-dasharray="1.5 1.5"/><path d="M6,104Q26,96 44,106T94,100"/><path d="M12,118q10,-6 22,0q10,6 22,0q10,-6 22,0" stroke-dasharray="1 2"/></g>`) + `
+  <rect x="3.6" y="3.6" width="92.8" height="132.8" rx="3" fill="none" stroke="#8a6532" stroke-width=".8"/>
+  <rect x="5.4" y="5.4" width="89.2" height="129.2" rx="2" fill="none" stroke="#8a6532" stroke-width=".3"/>`;
+const ringPip = s => pipArt(s, meGrad(s), ` stroke="${ME.gilt}" stroke-width="5" paint-order="stroke"`);
+function ringAce(s) {
+  return `<circle cx="50" cy="70" r="44" fill="url(#me-fire)"/>
+    <circle cx="50" cy="70" r="20" fill="#fff3c8" opacity=".6" filter="url(#soft2)"/>
+    <path id="me-acepath-${s}" d="M50,70m-36,0a36,36 0 1,1 72,0a36,36 0 1,1 -72,0" fill="none"/>
+    <text font-family="'Noto Sans Runic', serif" font-size="6.4" font-weight="400" fill="#b8380c" filter="url(#me-glow)"><textPath href="#me-acepath-${s}" textLength="224" lengthAdjust="spacing">${RUNES}${RUNES}</textPath></text>
+    <circle cx="51" cy="72" r="27" fill="none" stroke="#2a1404" stroke-width="7" opacity=".5" filter="url(#soft)"/>
+    <circle cx="50" cy="70" r="27" fill="none" stroke="#3a2008" stroke-width="7.5"/>
+    <circle cx="50" cy="70" r="27" fill="none" stroke="url(#me-gold)" stroke-width="5.8"/>
+    <circle cx="50" cy="70" r="30" fill="none" stroke="#fff4cf" stroke-width=".35" opacity=".8"/>
+    <path d="M28.5,61A23.5,23.5 0 0 1 59,46.5" fill="none" stroke="#fffbe8" stroke-width="1.4" stroke-linecap="round" opacity=".8" filter="url(#me-glow)"/>
+    <g transform="translate(35 55) scale(.3)">${pipArt(s, meGrad(s), ` stroke="${ME.gilt}" stroke-width="5" paint-order="stroke"`)}</g>`;
+}
+function ringEmblem(s, R) {
+  const fg = R.fg, rnd = rng(17 + s * 31);
+  if (s === 0) {
+    const tips = [[36, 86], [64, 86], [34, 74], [66, 74], [37, 65], [63, 65], [42, 60], [58, 60], [50, 61], [30, 81], [70, 81], [29, 70], [71, 70]];
+    const stars = range(7).map(i => { const [x, y] = polar(50, 68, 25, 200 + i * 140 / 6); return `<path d="${star(x, y, 2.8, 1.05, 5)}"/>`; }).join('');
+    const field = range(26).map(() => `<circle cx="${f2(22 + rnd() * 56)}" cy="${f2(18 + rnd() * 56)}" r="${f2(.2 + rnd() * .45)}" opacity="${f2(.4 + rnd() * .6)}"/>`).join('');
+    const branches = `<path d="M50,106C49,96 49.5,84 50,64" stroke-width="2.8"/>
+      <path d="M50,98q-8,-2 -14,-12 M50,98q8,-2 14,-12" stroke-width="1.5"/>
+      <path d="M50,88q-9,-3 -16,-14 M50,88q9,-3 16,-14" stroke-width="1.3"/>
+      <path d="M50,78q-8,-3 -13,-13 M50,78q8,-3 13,-13" stroke-width="1.1"/>
+      <path d="M50,70q-5,-3 -8,-10 M50,70q5,-3 8,-10" stroke-width=".9"/>
+      <path d="M50,106q-7,1 -11,4 M50,106q7,1 11,4" stroke-width="1.3"/>
+      <path d="M36,86q-4,-1 -6,-5 M64,86q4,-1 6,-5 M34,74q-3,0 -5,-4 M66,74q3,0 5,-4" stroke-width=".7"/>`;
+    return `<g fill="#fff">${field}</g>
+      <circle cx="68" cy="34" r="5" fill="#f4f1e2"/><circle cx="70" cy="32.6" r="4.6" fill="${R.top}"/><circle cx="68" cy="34" r="9" fill="#f4f1e2" opacity=".2" filter="url(#soft2)"/>
+      <path d="M20,124V102L28,95L34,99L42,88L50,97L58,86L66,95L72,91L80,99V124Z" fill="#1c2238"/>
+      <path d="M42,88L45,92L43,93.5 M58,86L61,90.5L59,91.6 M28,95L30,97.6" stroke="#cfd6e8" stroke-width=".7" fill="none" opacity=".8"/>
+      <ellipse cx="50" cy="110" rx="30" ry="5" fill="#cfd6ec" opacity=".25" filter="url(#soft2)"/>
+      <g stroke="${fg}" fill="none" stroke-linecap="round" opacity=".45" filter="url(#soft2)">${branches}</g>
+      <g stroke="${fg}" fill="none" stroke-linecap="round">${branches}</g>
+      <g fill="${fg}" filter="url(#me-glow)">${tips.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="1.2"/>`).join('')}${stars}</g>`;
+  }
+  if (s === 1) {
+    const leaves = range(14).map(() => { const x = f2(24 + rnd() * 52), y = f2(30 + rnd() * 76); return `<ellipse cx="${x}" cy="${y}" rx="1.5" ry=".7" transform="rotate(${f2(rnd() * 180)} ${x} ${y})"/>`; }).join('');
+    const motes = range(10).map(() => `<circle cx="${f2(24 + rnd() * 52)}" cy="${f2(24 + rnd() * 80)}" r="${f2(.4 + rnd() * .6)}"/>`).join('');
+    const rays = range(10).map(i => { const [x1, y1] = polar(50, 74, 70, -90 + (i - 4.5) * 18 - 3), [x2, y2] = polar(50, 74, 70, -90 + (i - 4.5) * 18 + 3); return `<path d="M50,74L${x1},${y1}L${x2},${y2}Z"/>`; }).join('');
+    return `<g fill="#fff" opacity=".1" filter="url(#soft)">${rays}</g>
+      <path d="M22,124V40Q24,60 25.5,124Z M78,124V40Q76,60 74.5,124Z" fill="url(#g-silver)" opacity=".55"/>
+      <path d="M26,58Q32,54 36,56 M74,62Q68,58 64,60" stroke="#d6e2de" stroke-width=".6" fill="none" opacity=".7"/>
+      <circle cx="50" cy="74" r="22" fill="${fg}" opacity=".45" filter="url(#soft2)"/>
+      <path d="${star(50, 74, 27, 6.2, 8)}" fill="${fg}"/>
+      <path d="${star(50, 74, 16, 4.2, 8)}" fill="#fbf4da" transform="rotate(22.5 50 74)"/>
+      <circle cx="50" cy="74" r="4.4" fill="#143238" stroke="${fg}" stroke-width="1.1"/><circle cx="49" cy="73" r="1.2" fill="#9fe0e0"/>
+      <g fill="#f0d27a" opacity=".85">${leaves}</g><g fill="#fffbe6" filter="url(#me-glow)">${motes}</g>
+      <path d="M50,110q-15,-2 -21,-11q13,0 21,11Z M50,110q15,-2 21,-11q-13,0 -21,11Z" fill="url(#g-leaf)" opacity=".85"/>
+      <path d="M50,110L31,100 M50,110L69,100" stroke="#e6f2c8" stroke-width=".35"/>`;
+  }
+  if (s === 2) {
+    // A horse head and neck in profile, facing left, against an evening sun.
+    const grass = range(34).map(() => { const x = f2(20 + rnd() * 60), y = f2(98 + rnd() * 26); return `<path d="M${x},${y}q${f2(rnd() * 2 - 1)},-2.5 ${f2(rnd() * 2 - 1)},-4.5"/>`; }).join('');
+    const horse = 'M56,47L54.6,38.6L59.4,45.4L62.2,38L63.4,47.6C70.5,51.5 76.5,61 78.4,77L80.5,104H63.5C63,94 61.4,84.5 59.4,76.6C56.6,80.2 51.6,82 46,82.6C42,83 39.2,84.6 36,85.6C32.8,86.4 30,85 29.4,82C28.8,79.2 29.2,76.6 31.2,75C36.4,68.4 44,58.2 50,52.2C52.2,50 54,48.2 56,47Z';
+    const crest = t => { const u = 1 - t; return [u ** 3 * 63.4 + 3 * u * u * t * 70.5 + 3 * u * t * t * 76.5 + t ** 3 * 78.4, u ** 3 * 47.6 + 3 * u * u * t * 51.5 + 3 * u * t * t * 61 + t ** 3 * 77]; };
+    const locks = range(11).map(i => { const [x, y] = crest(i / 10); return `<path d="M${f2(x - .6)},${f2(y - .4)}q${f2(4 + i * .2)},${f2(1.5 + i * .5)} ${f2(3.2 + rnd() * 1.5)},${f2(6 + rnd() * 2)}"/>`; }).join('')
+      + range(6).map(i => `<path d="M${f2(78.8 + i * .35)},${f2(78 + i * 4.4)}q3,2 2.6,5.2"/>`).join('');
+    return `<circle cx="32" cy="50" r="17" fill="#ffd27a" opacity=".6" filter="url(#soft2)"/><circle cx="32" cy="50" r="8.5" fill="#ffe6a8"/>
+      <ellipse cx="36" cy="64" rx="11" ry="2.2" fill="#fff" opacity=".5" filter="url(#soft)"/><ellipse cx="70" cy="40" rx="8" ry="2" fill="#fff" opacity=".45" filter="url(#soft)"/>
+      <path d="M18,92Q34,84 50,90T82,86V126H18Z" fill="#7d9a4e"/><path d="M18,100Q40,92 60,99T82,96V126H18Z" fill="#5a7d35"/>
+      <g stroke="#3d5a22" stroke-width=".45" fill="none" opacity=".8">${grass}</g>
+      <path d="M61,45C70,47 79.6,58 82.4,76L85.6,104H80.5L78.4,77C76.5,61 70.5,51.5 63.4,47.6Z" fill="#d8cdb0"/>
+      <path d="${horse}" fill="${fg}"/>
+      <path d="M58,77C60,86 62,95 63,104H69C67.6,92 64.6,82 60.6,74Z M47,82C51,80 55,78 58.6,75.6" stroke="none" fill="#7a6a4a" opacity=".3" filter="url(#soft)"/>
+      <path d="M68,52C74,60 77,72 78,88" stroke="#9a8c6c" stroke-width="3" opacity=".35" fill="none" filter="url(#soft)"/>
+      <path d="M58.5,63C54,61.5 48.8,64.5 48.2,70.4C47.8,75.4 51.6,79.2 56.6,79" stroke="#a89c80" stroke-width="1.2" fill="none" opacity=".6" filter="url(#soft)"/>
+      <path d="M47.5,56.5C42,63 37,69.6 33.6,73.6" stroke="#fff" stroke-width="1.4" opacity=".7" fill="none" filter="url(#soft)"/>
+      <path d="${horse}" fill="none" ${ln(.6, '#3a3020', .75)}/>
+      <path d="M55.4,40.8L57.4,45.2 M60.8,40.4L61.8,46" stroke="#8a7a5a" stroke-width=".8" stroke-linecap="round"/>
+      <g fill="none" stroke="#8f8264" stroke-width=".45" stroke-linecap="round">${locks}</g>
+      <path d="M57.6,45.4C55,48.4 53.4,51.4 54.4,55.6C56,52.4 57.8,49.6 60,47.2Z" fill="#d8cdb0" ${ln(.3, '#8f8264', .8)}/>
+      <path d="M49,58.4Q51.3,55.6 54,56.6Q52,59.4 49,58.4Z" fill="#241a10"/><circle cx="52.4" cy="57.3" r=".4" fill="#fff"/>
+      <path d="M48.6,56.2Q51.4,54 54.6,55.4" stroke="#6a5a40" stroke-width=".4" fill="none"/>
+      <path d="M32,78.8q1.2,-2.4 3.2,-1.5q-1,.6 -1.6,2.2Z" fill="#3a3020" opacity=".85"/>
+      <path d="M29.8,82.3q2.4,.9 5.4,.2 M36.2,85.4q1.4,-1.4 1,-3.2" stroke="#3a3020" stroke-width=".45" fill="none" opacity=".8"/>
+      <g fill="none" stroke="#5a3418" stroke-width="1.1" stroke-linecap="round">
+        <path d="M55.2,50.4L61.4,49.4"/><path d="M58.4,49.8C53,58 47,68 38.2,79.4"/><path d="M38.8,68.4C40.6,73 41.8,78 42,83.4"/><path d="M60.6,49.6C62.4,58 62,68 59.6,76"/></g>
+      <circle cx="37.6" cy="80.2" r="1.4" fill="none" stroke="url(#g-goldV)" stroke-width=".8"/>
+      <circle cx="38.8" cy="68.4" r=".9" fill="url(#g-goldV)"/><circle cx="58.4" cy="49.8" r=".9" fill="url(#g-goldV)"/><circle cx="47.6" cy="64.8" r=".7" fill="url(#g-goldV)"/>`;
+  }
+  const grass = range(40).map(() => { const x = f2(18 + rnd() * 64), y = f2(80 + rnd() * 44); return `<path d="M${x},${y}q${f2(rnd() - .5)},-1.6 ${f2(rnd() * 1.4 - .7)},-3"/>`; }).join('');
+  const flowers = range(16).map(() => `<circle cx="${f2(22 + rnd() * 56)}" cy="${f2(100 + rnd() * 10)}" r="${f2(.6 + rnd() * .5)}" fill="${['#e05a47', '#f2c94c', '#f6f0e0', '#c86ad8'][Math.floor(rnd() * 4)]}"/>`).join('');
+  return `<circle cx="72" cy="40" r="10" fill="#fff6c8" opacity=".7" filter="url(#soft2)"/><circle cx="72" cy="40" r="4.5" fill="#fff4c0"/>
+    <ellipse cx="34" cy="38" rx="11" ry="3.4" fill="#fff" opacity=".8" filter="url(#soft)"/><ellipse cx="40" cy="35.5" rx="6" ry="3" fill="#fff" opacity=".8" filter="url(#soft)"/><ellipse cx="62" cy="58" rx="9" ry="2.2" fill="#fff" opacity=".6" filter="url(#soft)"/>
+    <path d="M18,84Q34,72 52,80T82,74V126H18Z" fill="#a4c76a"/>
+    <path d="M18,104Q50,64 82,104V126H18Z" fill="#5d8a34"/><path d="M18,104Q50,64 82,104V126H18Z" fill="url(#g-shadeY)"/>
+    <g stroke="#3f6a22" stroke-width=".4" fill="none" opacity=".75">${grass}</g>
+    <path d="M44,124Q47,112 48,110H52Q53,112 56,124Z" fill="#d9c79c"/><path d="M45,124Q47.6,113 48.6,110.6" stroke="#b8a478" stroke-width=".4" fill="none"/>
+    <path d="M34,80v-7" stroke="#6b5a48" stroke-width="2.2"/><path d="M34,72q-3,-4 0,-8q3,-4 0,-8q-3,-4 0,-7" stroke="#fff" stroke-width="1.8" opacity=".55" fill="none" filter="url(#soft)"/>
+    <circle cx="50" cy="96" r="16.2" fill="#cdb98f"/>${range(12).map(i => { const [x, y] = polar(50, 96, 15, i * 30); return `<circle cx="${x}" cy="${y}" r="1.6" fill="${i % 2 ? '#bca67a' : '#d9c8a2'}"/>`; }).join('')}
+    <circle cx="50" cy="96" r="13.5" fill="${fg}"/><circle cx="50" cy="96" r="13.5" fill="url(#g-shadeX)" opacity=".6"/>
+    ${range(8).map(i => { const [x, y] = polar(50, 96, 13.5, i * 45); return `<path d="M50,96L${x},${y}" stroke="#1d3f1f" stroke-width=".5"/>`; }).join('')}
+    <path d="M40,90A12,12 0 0 1 52,84" stroke="#fff" stroke-width=".8" opacity=".3" fill="none"/>
+    <circle cx="50" cy="96" r="2.4" fill="url(#g-goldV)" ${ln(.35, '#6b4a12')}/><circle cx="49.3" cy="95.3" r=".6" fill="#fff" opacity=".8"/>
+    <circle cx="70" cy="88" r="6" fill="#ffd36b" opacity=".55" filter="url(#soft2)"/>
+    <circle cx="70" cy="88" r="3.6" fill="#f6d36b" stroke="#cdb98f" stroke-width="1.3"/><path d="M70,84.4V91.6 M66.4,88H73.6" stroke="#8a6a3a" stroke-width=".5"/>
+    <g>${flowers}</g>`;
+}
+function ringCourt(r, s) {
+  const R = REALMS[s], id = `mec${r}${s}`;
+  const arch = 'M20,124V46A30,30 0 0 1 80,46V124Z';
+  let crest;
+  if (r === 13) crest = `<path d="M35,32L34,17L41,24L50,12L59,24L66,17L65,32Z" fill="url(#me-gold)" stroke="${ME.umber}" stroke-width=".8" stroke-linejoin="round"/>
+    <path d="M35.6,31L35,18.6L41,24.6 M50,13.4L57,23" stroke="#fff8d8" stroke-width=".5" opacity=".7" fill="none"/>
+    <path d="M35,28.6H65" stroke="${ME.umber}" stroke-width=".6"/>
+    ${[[34, 17], [50, 12], [66, 17]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="1.2" fill="url(#g-pearl)"/>`).join('')}
+    <circle cx="50" cy="22.2" r="2.1" fill="url(#g-${red(s) ? 'ruby' : 'sapph'})" stroke="${ME.umber}" stroke-width=".4"/>`;
+  else if (r === 12) crest = `<path d="M33,25Q50,36 67,25" stroke="${ME.umber}" stroke-width="3.6" fill="none"/><path d="M33,25Q50,36 67,25" stroke="url(#me-gold)" stroke-width="2.4" fill="none"/>
+    <circle cx="50" cy="30" r="7" fill="#fffbe6" opacity=".6" filter="url(#soft2)"/>
+    <path d="${star(50, 30, 6, 1.9, 8)}" fill="#fffbe6" stroke="${ME.umber}" stroke-width=".4" filter="url(#me-glow)"/>`;
+  else crest = `<path d="M28,24H65" stroke="${ME.umber}" stroke-width="3.6" stroke-linecap="round"/>
+    <path d="M28,22.9H65V25.1H28Z" fill="url(#g-silver)"/><path d="M30,24H63" stroke="#5b6672" stroke-width=".3"/>
+    <path d="M63.8,18.5H66.2V29.5H63.8Z" fill="url(#me-gold)" stroke="${ME.umber}" stroke-width=".4"/><path d="M66,22.8H72V25.2H66Z" fill="#5a3418"/>
+    <circle cx="73.4" cy="24" r="1.9" fill="url(#me-gold)" stroke="${ME.umber}" stroke-width=".4"/>`;
+  return `<defs>${grad(id + 'g', [[0, R.top], [1, R.bot]])}<clipPath id="${id}"><path d="${arch}"/></clipPath></defs>
+    <path d="${arch}" fill="url(#${id}g)"/>
+    <g clip-path="url(#${id})">${ringEmblem(s, R)}<path d="${arch}" fill="none" stroke="#000" stroke-width="5" opacity=".35" filter="url(#soft)"/></g>
+    <path d="${arch}" fill="none" stroke="${ME.umber}" stroke-width="1.5"/>
+    <path d="M22.6,124V46A27.4,27.4 0 0 1 77.4,46V124" fill="none" stroke="#c8962e" stroke-width=".5"/>
+    ${crest}
+    <path d="M18,106H82L78.4,112L82,118H18L21.6,112Z" fill="url(#me-banner)" stroke="${ME.umber}" stroke-width=".8" stroke-linejoin="round"/>
+    <path d="M18,106L21.6,112L18,118Z M82,106L78.4,112L82,118Z" fill="#000" opacity=".18"/>`;
+}
+const ringCourtOver = (r, s) => {
+  const nm = THEMES.ring.names[r][s];
+  return `<text x="50" y="114.7" text-anchor="middle" font-family="'Uncial Antiqua', Cinzel, serif" font-weight="400" font-size="${nm.length > 7 ? 6.6 : 7.6}" fill="#3a2410">${nm}</text>`;
+};
+function ringBack() {
+  const stars = [[13, 15], [87, 15], [13, 125], [87, 125]].map(([x, y]) => `<path d="${star(x, y, 4.2, 1.3, 8)}"/>`).join('');
+  return `<defs>
+    ${rgrad('rg-bg', [[0, '#3a2410'], [.55, '#1a1009'], [1, '#070504']], 'cx=".5" cy=".5" r=".75"')}
+    <path id="rg-path" d="M50,70m-33,0a33,33 0 1,1 66,0a33,33 0 1,1 -66,0"/></defs>
+    <rect width="100" height="140" rx="7" fill="url(#rg-bg)"/>
+    <g filter="url(#paint)">
+    <rect x="4" y="4" width="92" height="132" rx="4" fill="none" stroke="#7a5a26" stroke-width=".6"/>
+    <rect x="6.2" y="6.2" width="87.6" height="127.6" rx="3" fill="none" stroke="#7a5a26" stroke-width=".25"/>
+    <g fill="#c89b45" opacity=".85">${stars}</g>
+    <circle cx="50" cy="70" r="44" fill="url(#me-fire)"/>
+    <circle cx="50" cy="70" r="30" fill="#ff8a2a" opacity=".18" filter="url(#soft2)"/>
+    <text font-family="'Noto Sans Runic', serif" font-size="6" fill="#ffb347" filter="url(#me-glow)"><textPath href="#rg-path" textLength="205" lengthAdjust="spacing">${RUNES}${RUNES}</textPath></text>
+    <circle cx="51.5" cy="72" r="22" fill="none" stroke="#000" stroke-width="7" opacity=".6" filter="url(#soft)"/>
+    <circle cx="50" cy="70" r="22" fill="none" stroke="#1f1004" stroke-width="7.5"/>
+    <circle cx="50" cy="70" r="22" fill="none" stroke="url(#me-gold)" stroke-width="5.6"/>
+    <circle cx="50" cy="70" r="24.6" fill="none" stroke="#fff4cf" stroke-width=".3" opacity=".7"/>
+    <circle cx="50" cy="70" r="19.4" fill="none" stroke="#5a3608" stroke-width=".4" opacity=".8"/>
+    <path d="M32.5,63A19.5,19.5 0 0 1 57,51.5" fill="none" stroke="#fffbe8" stroke-width="1.3" stroke-linecap="round" opacity=".8" filter="url(#me-glow)"/></g>`;
+}
+
+const THEMES = {
+  casino: {
+    name: 'Casino', blurb: 'Ivory cards, painted two-headed courts, engraved crimson backs.',
+    idxFont: "'Bodoni Moda', Didot, Georgia, serif", idxWeight: 700, ink: s => casInk(s),
+    bg: casinoBg, pip: casinoPip, ace: casinoAce, court: casinoCourt, back: casinoBack,
+  },
+  deco: {
+    name: 'Art Deco', blurb: 'Crisp gold sunbursts, stepped ziggurats, poster-style portraits.', painted: false,
+    idxFont: "'Josefin Sans', Futura, 'Century Gothic', sans-serif", idxWeight: 700, ink: s => red(s) ? DEC.red : DEC.black,
+    bg: decoBg, bgCourt: () => decoBg(true), pip: decoPip, ace: decoAce, court: decoCourt, back: decoBack,
+  },
+  ring: {
+    name: 'Four Realms', blurb: 'Parchment, a runed ring on every back, painted realms at court.',
+    idxFont: "Cinzel, 'Trajan Pro', Georgia, serif", idxWeight: 700, ink: s => red(s) ? ME.red : ME.black,
+    bg: ringBg, pip: ringPip, ace: ringAce, court: ringCourt, courtOver: ringCourtOver, back: ringBack,
+    // suits: ♠ the Star Kingdom, ♥ the Silver Wood, ♦ the Horse Plains, ♣ the Hill Country
+    // Names may only use glyphs in the embedded Uncial Antiqua subset (see FONT_CSS).
+    names: { 13: ['Haraldr', 'Hákon', 'Sigurðr', 'Björn'], 12: ['Ástríðr', 'Þóra', 'Guðrún', 'Ása'], 11: ['Eyvindr', 'Sveinn', 'Hrafn', 'Ketill'] },
+  },
+};
+const THEME_IDS = Object.keys(THEMES);
+const THEME_DEFS = {};
+for (const t of THEME_IDS) {
+  const T = THEMES[t];
+  let d = `<symbol id="${t}-bg" viewBox="0 0 100 140">${T.bg()}</symbol>`;
+  if (T.bgCourt) d += `<symbol id="${t}-bgc" viewBox="0 0 100 140">${T.bgCourt()}</symbol>`;
+  for (let s = 0; s < 4; s++) {
+    d += `<symbol id="${t}-pip-${s}" viewBox="0 0 100 100" overflow="visible">${T.pip(s)}</symbol>`;
+    d += `<symbol id="${t}-ace-${s}" viewBox="0 0 100 140">${T.ace(s)}</symbol>`;
+    for (let r = 11; r <= 13; r++) {
+      d += `<symbol id="${t}-court-${r}-${s}" viewBox="0 0 100 140">${T.court(r, s)}</symbol>`;
+      if (T.courtOver) d += `<symbol id="${t}-over-${r}-${s}" viewBox="0 0 100 140">${T.courtOver(r, s)}</symbol>`;
+    }
+  }
+  THEME_DEFS[t] = d;
+}
+
+function faceInner(s, r, t) {
+  const T = THEMES[t], Rk = RANK[r], pip = `#${t}-pip-${s}`, pf = T.painted === false ? '' : ' filter="url(#paint)"';
+  const idx = `<text x="11" y="18.5" text-anchor="middle" font-size="${r === 10 ? 13 : 15.5}"${r === 10 ? ' letter-spacing="-1"' : ''}>${Rk}</text><use href="${pip}" x="5" y="22" width="12" height="12"/>`;
+  let mid;
+  if (r === 1) mid = `<g${pf}><use href="#${t}-ace-${s}" width="100" height="140"/></g>`;
+  else if (r > 10) mid = `<g${pf}><use href="#${t}-court-${r}-${s}" width="100" height="140"/></g>${T.courtOver ? `<use href="#${t}-over-${r}-${s}" width="100" height="140"/>` : ''}`;
+  else mid = `<g class="lg"${pf}>${PIPS[r].map(([x, y]) => `<use href="${pip}" x="${x - 8.5}" y="${y - 8.5}" width="17" height="17"${y > 70 ? ` transform="rotate(180 ${x} ${y})"` : ''}/>`).join('')}</g><use class="sm" href="${pip}" x="27" y="62" width="46" height="46"/>`;
+  return `<g font-family="${T.idxFont}" font-weight="${T.idxWeight}" fill="${T.ink(s)}"><use href="#${t}-${r > 10 && T.bgCourt ? 'bgc' : 'bg'}" width="100" height="140"/>${mid}
+    <g class="lg">${idx}<g transform="rotate(180 50 70)">${idx}</g></g>
+    <g class="sm"><text x="5" y="33" font-size="31"${r === 10 ? ' letter-spacing="-3"' : ''}>${Rk}</text><use href="${pip}" x="64" y="7" width="29" height="29"/></g></g>`;
+}
+const faceHTML = (s, r, t) => `<span class="face"><svg viewBox="0 0 100 140" preserveAspectRatio="none" aria-hidden="true">${faceInner(s, r, t)}</svg></span>`;
+const backHTML = tid => `<svg class="back" viewBox="0 0 100 140" preserveAspectRatio="none" aria-hidden="true"><use href="#back-${tid}"></use></svg>`;
+// A standalone SVG image can't reach the page's web fonts, so the few glyphs the cards use are embedded here
+// (subsets of Bodoni Moda, Josefin Sans, Cinzel, Uncial Antiqua and Noto Sans Runic). Each subset keeps its copyright notice and the SIL Open Font License 1.1
+// in its own name table (IDs 0, 13 and 14), so copies of this file stay compliant on their own; OFL.txt has the full text.
+// Copyright 2020 The Bodoni Moda Project Authors (https://github.com/indestructible-type/Bodoni)
+// Copyright 2010 The Josefin Sans Project Authors (https://github.com/ThomasJockin/JosefinSansFont-master), with Reserved Font Name "Josefin Sans"
+// Copyright 2020 The Cinzel Project Authors (https://github.com/NDISCOVER/Cinzel)
+// Copyright (c) 2011 by Brian J. Bonislawsky DBA Astigmatic (AOETI) (astigma@astigmatic.com), with Reserved Font Name "Uncial Antiqua"
+// Copyright 2022 The Noto Project Authors (https://github.com/notofonts/runic)
+const FONT_CSS = `@font-face{font-family:'Bodoni Moda';font-weight:700;src:url(data:font/woff2;base64,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) format('woff2')}@font-face{font-family:'Josefin Sans';font-weight:700;src:url(data:font/woff2;base64,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) format('woff2')}@font-face{font-family:'Cinzel';font-weight:700;src:url(data:font/woff2;base64,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) format('woff2')}@font-face{font-family:'Uncial Antiqua';font-weight:400;src:url(data:font/woff2;base64,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) format('woff2')}@font-face{font-family:'Noto Sans Runic';font-weight:400;src:url(data:font/woff2;base64,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) format('woff2')}`;
+// A standalone image of a face, for the win animation's canvas trails.
+const faceImageURL = (s, r, t, w, h) => 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 140" width="${w}" height="${h}" preserveAspectRatio="none"><style>${FONT_CSS}.sm{display:none}</style><defs>${GLOBAL_DEFS}${THEME_DEFS[t]}</defs>${faceInner(s, r, t)}</svg>`);
+$('backs').innerHTML = GLOBAL_DEFS + THEME_IDS.map(t => THEME_DEFS[t] + `<symbol id="back-${t}" viewBox="0 0 100 140">${THEMES[t].back()}</symbol>`).join('');
+
+/* ---------- bitmap faces ---------- */
+// Live SVG filters (paper grain, brush wobble, soft glows) are drawn at low resolution by phone and tablet
+// browsers, and with 50+ filtered cards on screen they also drop detail under memory pressure, so cards
+// come out soft or patchy. Instead, each distinct face and back is painted once into a bitmap at the screen's
+// real pixel density and shown as a plain image. Repainted only when the card size, density or deck changes.
+const RAS = new Map();
+let rasBusy = 0;
+const rasDims = () => { const dpr = Math.min(3, Math.max(1, devicePixelRatio || 1)); return [Math.round(M.cw * dpr), Math.round(M.ch * dpr)]; };
+function rasSVG(kind, s, r, t, w, h, small) {
+  const body = kind === 'b' ? `<use href="#back-${t}" width="100" height="140"/>` : faceInner(s, r, t);
+  const extra = kind === 'b' ? `<symbol id="back-${t}" viewBox="0 0 100 140">${THEMES[t].back()}</symbol>` : '';
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 140" width="${w}" height="${h}" preserveAspectRatio="none"><style>${FONT_CSS}${small ? '.lg{display:none}' : '.sm{display:none}'}</style><defs>${GLOBAL_DEFS}${THEME_DEFS[t]}${extra}</defs>${body}</svg>`;
+}
+const loadImg = src => new Promise((ok, bad) => { const im = new Image(); im.onload = () => ok(im); im.onerror = bad; im.src = src; });
+async function rasPaint(svg, w, h) {
+  const src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  const im = await loadImg(src);
+  // Give the embedded fonts a beat to settle; some browsers fire load before an SVG image's fonts are ready.
+  await new Promise(r => setTimeout(r, 40));
+  try {
+    const cv = document.createElement('canvas');
+    cv.width = w; cv.height = h;
+    cv.getContext('2d').drawImage(im, 0, 0, w, h);
+    const blob = await new Promise(r => cv.toBlob(r, 'image/png'));
+    cv.width = cv.height = 0;
+    if (blob) return URL.createObjectURL(blob);
+  } catch {}
+  return src; // canvas refused (older Safari): the SVG image itself is still far lighter than live filters
+}
+function useRas(el, slot, id, key, make, w, h, pri) {
+  const img = el.querySelector(slot === 'f' ? '.rf' : '.rb'), cls = slot === 'f' ? 'hf' : 'hb';
+  if (!img) return;
+  let e = RAS.get(key);
+  if (!e) RAS.set(key, e = { url: null, make, w, h, pri, t: theme, busy: false, dead: false });
+  else if (pri < e.pri) e.pri = pri;
+  if (e.url) {
+    if (img._k !== key) {
+      img._k = key; img._id = id;
+      img.onload = () => { if (img._k === key) el.classList.add(cls); };
+      img.src = e.url;
+    }
+  } else if (img._id !== id) el.classList.remove(cls); // a different card or deck: fall back to live SVG until ready
+}
+function applyRaster() {
+  if (!M || !G) return;
+  const [w, h] = rasDims(), small = M.cw < 72, t = theme, sz = w + 'x' + h + (small ? 's' : '');
+  for (const c of allCards()) {
+    const el = els[c.id];
+    if (!el) continue;
+    useRas(el, 'f', `${t}|${c.s}|${c.r}`, `${t}|f|${c.s}|${c.r}|${sz}`, () => rasSVG('f', c.s, c.r, t, w, h, small), w, h, c.up ? 0 : 2);
+    useRas(el, 'b', `${t}|b`, `${t}|b|${sz}`, () => rasSVG('b', 0, 0, t, w, h, small), w, h, 1);
+  }
+  rasPump(sz);
+}
+function rasPump(sz) {
+  while (rasBusy < 3) {
+    let best = null;
+    for (const [k, e] of RAS) {
+      if (e.url || e.busy || e.dead || e.t !== theme || !k.endsWith('|' + sz)) continue;
+      if (!best || e.pri < best.pri) best = e;
+    }
+    if (!best) break;
+    const e = best;
+    e.busy = true; rasBusy++;
+    rasPaint(e.make(), e.w, e.h).then(u => { e.url = u; }, () => { e.dead = true; })
+      .finally(() => { e.busy = false; rasBusy--; applyRaster(); });
+  }
+  // Forget bitmaps for sizes no longer on screen once enough pile up.
+  if (RAS.size > 300) for (const [k, e] of RAS) if (!k.endsWith('|' + sz) && !e.busy) {
+    if (e.url && e.url.startsWith('blob:')) URL.revokeObjectURL(e.url);
+    RAS.delete(k);
+  }
+}
+
+/* ================= games ================= */
+let G, O, gid, st, piles = [], meta = {}, rows = [[], []], history = [];
+const kindOf = pid => meta[pid].kind;
+const idsOf = k => piles.filter(p => p.kind === k).map(p => p.id);
+const top = pid => { const a = st.p[pid]; return a[a.length - 1]; };
+const altDesc = (t, c) => red(t.s) !== red(c.s) && t.r === c.r + 1;
+const flipTop = pid => { const t = top(pid); if (t && !t.up) t.up = true; };
+const emptyPiles = list => Object.fromEntries(list.map(p => [p.id, []]));
+const fitsFound = (cards, pid) => {
+  if (cards.length !== 1) return false;
+  const c = cards[0], t = top(pid);
+  return t ? t.s === c.s && t.r === c.r - 1 : c.r === 1;
+};
+const allFoundFull = () => idsOf('found').every(id => st.p[id].length === 13);
+const foundRow = (n, col0, hint) => range(n).map(k => ({ id: 'f' + k, kind: 'found', row: 0, col: col0 + k, hint, name: 'Foundation ' + (k + 1) }));
+const tabRow = (n, hint) => range(n).map(k => ({ id: 't' + k, kind: 'tab', row: 1, col: k, hint, name: 'Column ' + (k + 1) }));
+
+const GAMES = {
+  klondike: {
+    name: 'Klondike', cols: 7, defaults: { draw: 1 },
+    opts: [{ key: 'draw', values: [1, 3], label: v => 'Draw ' + v }],
+    rules: 'Build the four foundations up from Ace to King in one suit. In the columns, stack cards down in alternating colors; only a King can fill an empty column. Click the stock to turn cards over, one or three at a time.',
+    piles: o => [
+      { id: 'stock', kind: 'stock', row: 0, col: 0, name: 'Stock' },
+      { id: 'waste', kind: 'waste', row: 0, col: 1, fan: o.draw, name: 'Waste' },
+      ...foundRow(4, 3, 'A'), ...tabRow(7, 'K'),
+    ],
+    deal() {
+      const d = deckOf([0, 1, 2, 3]), p = emptyPiles(piles);
+      for (let i = 0; i < 7; i++) for (let j = i; j < 7; j++) p['t' + j].push(d.pop());
+      idsOf('tab').forEach(id => { p[id][p[id].length - 1].up = true; });
+      p.stock = d;
+      return p;
+    },
+    canPick(pid, i) {
+      const a = st.p[pid], k = kindOf(pid);
+      if (!a[i] || k === 'stock') return false;
+      return k === 'tab' ? a[i].up : i === a.length - 1;
+    },
+    canDrop(cards, pid) {
+      const k = kindOf(pid);
+      if (k === 'found') return fitsFound(cards, pid);
+      if (k === 'tab') { const t = top(pid); return t ? t.up && altDesc(t, cards[0]) : cards[0].r === 13; }
+      return false;
+    },
+    after(from) { if (kindOf(from) === 'tab') flipTop(from); },
+    stock() {
+      const s = st.p.stock, w = st.p.waste;
+      if (!s.length) {
+        if (!w.length) return false;
+        st.p.stock = w.reverse(); st.p.stock.forEach(c => { c.up = false; }); st.p.waste = [];
+        return true;
+      }
+      for (let n = Math.min(O.draw, s.length); n > 0; n--) { const c = s.pop(); c.up = true; w.push(c); }
+      return true;
+    },
+    canFinish: () => idsOf('tab').every(id => st.p[id].every(c => c.up)),
+    // While finishing, turn stock cards one at a time so every card reaches the top of the waste.
+    finishStep() {
+      const s = st.p.stock, w = st.p.waste;
+      if (s.length) { const c = s.pop(); c.up = true; w.push(c); return true; }
+      if (w.length) { st.p.stock = w.reverse(); st.p.stock.forEach(c => { c.up = false; }); st.p.waste = []; return true; }
+      return false;
+    },
+    auto: true,
+    won: allFoundFull,
+  },
+
+  spider: {
+    name: 'Spider', cols: 10, defaults: { suits: 1 }, stockGroups: 10,
+    opts: [{ key: 'suits', values: [1, 2, 4], label: v => v + (v > 1 ? ' suits' : ' suit') }],
+    rules: 'Build runs from King down to Ace in the columns. Any card can go on a card one rank higher, but only a run of one suit moves together. A full King-to-Ace run in one suit clears to the foundations. Click the stock to deal a card onto every column; each column needs at least one card first.',
+    piles: () => [
+      { id: 'stock', kind: 'stock', row: 0, col: 0, name: 'Stock' },
+      ...foundRow(8, 2, ''), ...tabRow(10, ''),
+    ],
+    deal(o) {
+      const set = o.suits === 1 ? [0] : o.suits === 2 ? [0, 1] : [0, 1, 2, 3];
+      const d = deckOf(range(8).map(k => set[k % set.length])), p = emptyPiles(piles);
+      for (let i = 0; i < 54; i++) p['t' + (i % 10)].push(d.pop());
+      idsOf('tab').forEach(id => { p[id][p[id].length - 1].up = true; });
+      p.stock = d;
+      return p;
+    },
+    canPick(pid, i) {
+      const a = st.p[pid];
+      if (kindOf(pid) !== 'tab' || !a[i] || !a[i].up) return false;
+      for (let j = i + 1; j < a.length; j++) if (a[j].s !== a[i].s || a[j - 1].r !== a[j].r + 1) return false;
+      return true;
+    },
+    canDrop(cards, pid) {
+      if (kindOf(pid) !== 'tab') return false;
+      const t = top(pid);
+      return !t || t.r === cards[0].r + 1;
+    },
+    after(from, to) { flipTop(from); spiderClear(to); },
+    stock() {
+      const s = st.p.stock, tabs = idsOf('tab');
+      if (!s.length) return false;
+      if (tabs.some(id => !st.p[id].length)) return 'Every column needs at least one card before you deal.';
+      const rounds = Math.floor(s.length / tabs.length);
+      for (let k = 0; k < rounds; k++) tabs.forEach(id => { const c = s.pop(); c.up = true; st.p[id].push(c); });
+      tabs.forEach(spiderClear);
+      return true;
+    },
+    won: allFoundFull,
+  },
+
+  freecell: {
+    name: 'FreeCell', cols: 8, defaults: {},
+    opts: [],
+    rules: 'Every card is dealt face up. Build the foundations up from Ace in one suit. In the columns, stack down in alternating colors. Each of the four free cells holds one card. You can move a run at once when there are enough free cells and empty columns to have moved it one card at a time.',
+    piles: () => [
+      ...range(4).map(k => ({ id: 'c' + k, kind: 'cell', row: 0, col: k, hint: '', name: 'Free cell ' + (k + 1) })),
+      ...foundRow(4, 4, 'A'), ...tabRow(8, ''),
+    ],
+    deal() {
+      const d = deckOf([0, 1, 2, 3]), p = emptyPiles(piles);
+      d.forEach((c, i) => { c.up = true; p['t' + (i % 8)].push(c); });
+      return p;
+    },
+    canPick(pid, i) {
+      const a = st.p[pid];
+      if (!a[i]) return false;
+      if (kindOf(pid) !== 'tab') return i === a.length - 1;
+      for (let j = i + 1; j < a.length; j++) if (!altDesc(a[j - 1], a[j])) return false;
+      return a.length - i <= fcCap(null);
+    },
+    canDrop(cards, pid) {
+      const k = kindOf(pid);
+      if (k === 'cell') return cards.length === 1 && !st.p[pid].length;
+      if (k === 'found') return fitsFound(cards, pid);
+      if (k === 'tab') { const t = top(pid); return t ? altDesc(t, cards[0]) && cards.length <= fcCap(null) : cards.length <= fcCap(pid); }
+      return false;
+    },
+    canFinish: () => idsOf('tab').every(id => st.p[id].every((c, j, a) => !j || a[j - 1].r > c.r)),
+    auto: true,
+    won: allFoundFull,
+  },
+};
+const GAME_IDS = Object.keys(GAMES);
+
+function fcCap(target) {
+  const free = idsOf('cell').filter(id => !st.p[id].length).length;
+  const empty = idsOf('tab').filter(id => id !== target && !st.p[id].length).length;
+  return (free + 1) * 2 ** empty;
+}
+function spiderClear(pid) {
+  const a = st.p[pid];
+  if (a.length < 13) return;
+  const run = a.slice(-13);
+  if (!run.every((c, j) => c.up && c.s === run[0].s && c.r === 13 - j)) return;
+  const f = idsOf('found').find(id => !st.p[id].length);
+  if (!f) return;
+  a.splice(-13);
+  st.p[f].push(...run.reverse());
+  flipTop(pid);
+}
+
+/* ================= engine ================= */
+const table = $('table');
+const els = {};
+let slotEls = {}, sel = null, cur = null, drag = null, M = null, kbd = false, autoT = null, cele = null, theme;
+let pendingConfirm = null, toastT = 0, autoStartT = 0, autoHold = false, inAuto = false;
+
+const allCards = () => piles.flatMap(p => st.p[p.id]);
+const tabIds = () => idsOf('tab');
+const statsKey = () => gid + ':' + Object.values(O).join('-');
+
+function snap() { history.push(JSON.stringify({ p: st.p, moves: st.moves })); if (history.length > 1000) history.shift(); }
+function begin() {
+  if (st.started) return;
+  st.started = true;
+  const s = store.get('stats.' + statsKey(), { played: 0, won: 0, best: 0 });
+  s.played++; store.set('stats.' + statsKey(), s);
+}
+function save() { store.set('save.' + gid, { o: O, st }); store.set('game', gid); }
+
+function changed() {
+  if (!st.won && G.won()) {
+    st.won = true; sel = null;
+    const s = store.get('stats.' + statsKey(), { played: 1, won: 0, best: 0 });
+    s.won++; s.best = s.best ? Math.min(s.best, st.elapsed) : st.elapsed;
+    store.set('stats.' + statsKey(), s);
+    setTimeout(celebrate, 380);
+  }
+  save(); render();
+  maybeAutoFinish();
+}
+
+function move(from, i, to) {
+  if (from === to || st.won) return false;
+  if (!G.canPick(from, i)) return false;
+  const cards = st.p[from].slice(i);
+  if (!G.canDrop(cards, to)) return false;
+  snap();
+  if (!inAuto) autoHold = false;
+  st.p[from].splice(i);
+  st.p[to].push(...cards);
+  if (G.after) G.after(from, to);
+  st.moves++; begin(); changed();
+  return true;
+}
+
+function stockAction() {
+  stopAuto();
+  if (st.won || !G.stock) return;
+  snap();
+  const r = G.stock();
+  if (r !== true) { history.pop(); if (r) toast(r); return; }
+  sel = null; autoHold = false; st.moves++; begin(); changed();
+}
+
+function undo() {
+  stopAuto();
+  if (!history.length || st.won) return;
+  const h = JSON.parse(history.pop());
+  st.p = h.p; st.moves = h.moves; sel = null; autoHold = true;
+  changed();
+}
+
+function smart(pid, i) {
+  if (!G.canPick(pid, i)) return false;
+  const cards = st.p[pid].slice(i), c = cards[0], k = kindOf(pid);
+  const tabs = tabIds().filter(t => t !== pid);
+  const full = tabs.filter(t => st.p[t].length).sort((x, y) => (top(y).s === c.s) - (top(x).s === c.s));
+  const empty = tabs.filter(t => !st.p[t].length);
+  const order = [
+    ...(k !== 'found' ? idsOf('found') : []), ...full,
+    ...(cards.length === 1 && k !== 'cell' ? idsOf('cell') : []),
+    ...(k === 'tab' && i === 0 ? [] : empty),
+  ];
+  for (const t of order) if (move(pid, i, t)) { cur = { pile: t, idx: Infinity }; return true; }
+  shake(c.id);
+  return false;
+}
+
+function autoStep() {
+  const sources = piles.filter(p => p.kind === 'waste' || p.kind === 'tab' || p.kind === 'cell').map(p => p.id);
+  inAuto = true;
+  try {
+    for (const s of sources) {
+      const a = st.p[s];
+      if (!a.length) continue;
+      for (const f of idsOf('found')) if (move(s, a.length - 1, f)) return true;
+    }
+    if (G.finishStep && G.canFinish() && !st.won) {
+      snap();
+      if (G.finishStep()) { st.moves++; changed(); return true; }
+      history.pop();
+    }
+    return false;
+  } finally { inAuto = false; }
+}
+function autoplay(quiet) {
+  stopAuto();
+  if (!G.auto || st.won) return;
+  sel = null;
+  if (!autoStep()) { if (!quiet) toast('No cards can go to the foundations right now.'); return; }
+  autoT = setInterval(() => { if (!autoStep()) stopAuto(); }, reduced.matches ? 30 : 110);
+  ui();
+}
+function stopAuto() { clearInterval(autoT); autoT = null; clearTimeout(autoStartT); }
+// Once the rest of the game is a formality (every card face up), finish it without being asked.
+// Undo pauses this until the next move, so a player can still step back.
+function maybeAutoFinish() {
+  if (autoT || autoHold || st.won || !G.auto || !G.canFinish || !G.canFinish()) return;
+  clearTimeout(autoStartT);
+  autoStartT = setTimeout(() => {
+    if (autoT || autoHold || st.won || drag || !G.canFinish()) return;
+    toast('Every card is face up. Finishing the game.');
+    autoplay(true);
+  }, 450);
+}
+
+/* ---------- layout ---------- */
+function metrics() {
+  const W = table.clientWidth, cols = G.cols;
+  const gap = Math.round(Math.max(5, Math.min(16, W * .014)));
+  const cw = Math.floor(Math.min(124, (W - gap * (cols - 1)) / cols));
+  const ch = Math.round(cw * 1.4);
+  const ox = Math.floor((W - (cw * cols + gap * (cols - 1))) / 2);
+  const tabY = ch + Math.round(gap * 1.6 + ch * .06);
+  const topPx = table.getBoundingClientRect().top + scrollY;
+  const avail = Math.max(ch * 3.4, innerHeight - topPx - 54);
+  return { W, gap, cw, ch, tabY, avail, x: c => ox + c * (cw + gap) };
+}
+function fan(a) {
+  const down = a.filter(c => !c.up).length, up = a.length - down, room = M.avail - M.tabY - M.ch;
+  let dOff = M.ch * .1, uOff = M.ch * .27;
+  if (up > 1 && down * dOff + (up - 1) * uOff > room) {
+    uOff = Math.max(M.ch * .14, (room - down * dOff) / (up - 1));
+    if (down * dOff + (up - 1) * uOff > room) dOff = Math.max(M.ch * .04, (room - (up - 1) * uOff) / Math.max(1, down));
+  }
+  let y = M.tabY;
+  return a.map(c => { const v = y; y += c.up ? uOff : dOff; return v; });
+}
+const slotXY = m => [M.x(m.col), m.row ? M.tabY : 0];
+
+function slotLabel(m) {
+  if (m.kind === 'stock') return gid === 'klondike' && !st.p.stock.length && st.p.waste.length ? '↻' : '';
+  return m.hint || '';
+}
+
+function buildSlots() {
+  Object.values(slotEls).forEach(e => e.remove());
+  slotEls = {};
+  for (const m of piles) {
+    const s = document.createElement('div');
+    s.className = 'slot'; s.dataset.pile = m.id; s.dataset.kind = m.kind;
+    table.prepend(s); slotEls[m.id] = s;
+  }
+}
+
+function ensureEls() {
+  const live = new Set();
+  for (const c of allCards()) {
+    live.add(c.id);
+    let el = els[c.id];
+    if (!el) { el = document.createElement('div'); el.dataset.id = c.id; table.appendChild(el); els[c.id] = el; el._p = null; }
+    const key = c.s + '-' + c.r + '-' + theme;
+    if (el._key !== key) {
+      el.className = 'card ' + (red(c.s) ? 'red' : 'black');
+      el.innerHTML = faceHTML(c.s, c.r, theme).replace('<svg', '<img class="rf" alt="" draggable="false"><svg')
+        + backHTML(theme) + '<img class="rb" alt="" draggable="false">';
+      el._key = key;
+    }
+    el.style.visibility = '';
+    el._up = c.up;
+  }
+  for (const id in els) if (!live.has(+id)) { els[id].remove(); delete els[id]; }
+}
+
+function render() {
+  if (!G) return;
+  M = metrics();
+  table.style.setProperty('--cw', M.cw + 'px');
+  table.style.setProperty('--ch', M.ch + 'px');
+  table.classList.toggle('small', M.cw < 72);
+  let maxY = M.tabY + M.ch;
+  const pos = {};
+  for (const m of piles) {
+    const [x0, y0] = slotXY(m), a = st.p[m.id];
+    const s = slotEls[m.id];
+    s.style.transform = `translate(${x0}px,${y0}px)`;
+    s.textContent = slotLabel(m);
+    if (m.kind === 'tab') {
+      const ys = fan(a);
+      a.forEach((c, i) => { pos[c.id] = { x: x0, y: ys[i], z: 300 + i }; });
+      if (a.length) maxY = Math.max(maxY, ys[ys.length - 1] + M.ch);
+    } else if (m.kind === 'waste') {
+      const vis = m.fan || 1, n = a.length;
+      a.forEach((c, i) => { pos[c.id] = { x: x0 + Math.max(0, i - (n - vis)) * M.cw * .26, y: y0, z: 100 + i }; });
+    } else if (m.kind === 'stock') {
+      const g = G.stockGroups;
+      a.forEach((c, i) => { pos[c.id] = { x: x0 + (g ? Math.floor(i / g) * M.cw * .11 : 0), y: y0, z: 10 + i }; });
+    } else {
+      a.forEach((c, i) => { pos[c.id] = { x: x0, y: y0, z: 200 + i }; });
+    }
+  }
+  // Whole-pixel positions keep fine card linework sharp; fractional offsets get resampled and blur.
+  for (const id in pos) { pos[id].x = Math.round(pos[id].x); pos[id].y = Math.round(pos[id].y); }
+  table.style.height = Math.ceil(maxY + 6) + 'px';
+  const dragIds = drag && drag.moved ? new Set(drag.ids) : null;
+  for (const c of allCards()) {
+    const el = els[c.id], p = pos[c.id];
+    if (el._up === false && c.up) flipAnim(el);
+    el._up = c.up;
+    el.classList.toggle('up', c.up);
+    el.classList.toggle('down', !c.up);
+    if (cele || (dragIds && dragIds.has(c.id))) continue;
+    const pr = el._p, moved = !pr || pr.x !== p.x || pr.y !== p.y;
+    el.style.transform = `translate(${p.x}px,${p.y}px)`;
+    clearTimeout(el._t);
+    if (moved && pr) { el.style.zIndex = 1500 + p.z; el._t = setTimeout(() => { el.style.zIndex = p.z; }, 230 + (el._d || 0)); }
+    else el.style.zIndex = p.z;
+    el._p = p;
+  }
+  table.querySelectorAll('.sel').forEach(e => e.classList.remove('sel'));
+  if (sel) st.p[sel.pile].slice(sel.idx).forEach(c => els[c.id].classList.add('sel'));
+  table.querySelectorAll('.cur').forEach(e => e.classList.remove('cur'));
+  if (cur) {
+    norm();
+    const a = st.p[cur.pile];
+    (cur.idx >= 0 ? els[a[cur.idx].id] : slotEls[cur.pile]).classList.add('cur');
+  }
+  ui();
+  applyRaster();
+}
+
+function ui() {
+  $('moves').textContent = st.moves;
+  $('time').textContent = fmt(st.elapsed);
+  $('bUndo').disabled = !history.length || st.won;
+  $('bFinish').hidden = !(G.canFinish && !st.won && !autoT && autoHold && G.canFinish());
+}
+
+function flipAnim(el) {
+  if (reduced.matches || !el.animate) return;
+  el.animate([{ rotate: 'y 90deg' }, { rotate: 'y 0deg' }], { duration: 200, easing: 'ease-out' });
+}
+function shake(id) {
+  const el = els[id];
+  if (!el || reduced.matches || !el.animate) return;
+  el.animate([{ translate: '0 0' }, { translate: '-5px 0' }, { translate: '5px 0' }, { translate: '-3px 0' }, { translate: '0 0' }], { duration: 260 });
+}
+function toast(msg) {
+  const t = $('toast');
+  t.textContent = msg; t.hidden = false;
+  clearTimeout(toastT); toastT = setTimeout(() => { t.hidden = true; }, 2600);
+}
+function announce() {
+  if (!cur) return;
+  const a = st.p[cur.pile], c = a[cur.idx];
+  $('live').textContent = meta[cur.pile].name + ': ' + (c ? (c.up ? `${RANK_NAME[c.r]} of ${SUIT_NAME[c.s]}` : 'face-down card') : 'empty');
+}
+
+/* ---------- game setup ---------- */
+function startGame(id, o, saved) {
+  stopAuto(); endCelebrate(true); hideNotice();
+  $('win').hidden = true;
+  gid = id; G = GAMES[id]; O = { ...G.defaults, ...(o || {}) };
+  piles = G.piles(O);
+  meta = Object.fromEntries(piles.map(p => [p.id, p]));
+  rows = [0, 1].map(r => piles.filter(p => p.row === r).sort((a, b) => a.col - b.col));
+  st = saved || { p: null, moves: 0, elapsed: 0, started: false, won: false };
+  if (!saved) st.p = G.deal(O);
+  history = []; sel = null; autoHold = false; cur = { pile: rows[1][0].id, idx: Infinity };
+  buildSlots(); ensureEls(); buildBar();
+  $('rules').textContent = G.rules;
+  if (saved) {
+    table.classList.add('still'); render(); void table.offsetWidth; table.classList.remove('still');
+  } else dealAnim();
+  save();
+  maybeAutoFinish();
+}
+
+function dealAnim() {
+  M = metrics();
+  const src = { x: M.x(0), y: 0 };
+  table.classList.add('still');
+  for (const c of allCards()) { const el = els[c.id]; el.style.transform = `translate(${src.x}px,${src.y}px)`; el._p = src; el._d = 0; }
+  void table.offsetWidth;
+  table.classList.remove('still');
+  if (!reduced.matches) {
+    tabIds().forEach((id, col) => st.p[id].forEach((c, i) => {
+      const d = (i * G.cols + col) * 13;
+      els[c.id].style.transitionDelay = d + 'ms'; els[c.id]._d = d;
+    }));
+  }
+  render();
+  setTimeout(() => { for (const id in els) { els[id].style.transitionDelay = ''; els[id]._d = 0; } }, 1400);
+}
+
+function buildBar() {
+  $('games').innerHTML = GAME_IDS.map(g => `<button type="button" data-game="${g}" aria-pressed="${g === gid}">${GAMES[g].name}</button>`).join('');
+  $('opts').innerHTML = G.opts.map(op => `<div class="seg" role="group" aria-label="${op.key}">${op.values.map(v =>
+    `<button type="button" data-opt="${op.key}" data-val="${v}" aria-pressed="${O[op.key] === v}">${op.label(v)}</button>`).join('')}</div>`).join('');
+}
+
+function setGame(id) {
+  if (id === gid) return;
+  save();
+  const sv = store.get('save.' + id, null);
+  const ok = sv && sv.st && !sv.st.won && validSave(id, sv);
+  startGame(id, ok ? sv.o : store.get('opts.' + id, GAMES[id].defaults), ok ? sv.st : null);
+  store.set('game', id);
+}
+function validSave(id, sv) {
+  try {
+    const list = GAMES[id].piles({ ...GAMES[id].defaults, ...sv.o });
+    const n = list.reduce((t, p) => t + (sv.st.p[p.id] || []).length, 0);
+    return n === (id === 'spider' ? 104 : 52) && (id !== 'spider' || (sv.st.p.stock || []).length % 10 === 0);
+  } catch { return false; }
+}
+function setOpt(key, val) {
+  if (O[key] === val) return;
+  const op = G.opts.find(x => x.key === key);
+  const go = () => { const o = { ...O, [key]: val }; store.set('opts.' + gid, o); startGame(gid, o, null); };
+  if (st.moves > 0 && !st.won) askConfirm(`Switch to ${op.label(val)}? That deals a new game.`, go, 'Switch and deal');
+  else go();
+}
+function newGame(force) {
+  const go = () => startGame(gid, O, null);
+  if (!force && st.moves > 0 && !st.won) askConfirm('Abandon this game and deal a new one?', go, 'Deal new game');
+  else go();
+}
+function askConfirm(text, yes, label) {
+  pendingConfirm = yes;
+  $('noticeText').textContent = text;
+  $('nYes').textContent = label;
+  $('notice').hidden = false;
+  $('nYes').focus();
+  render();
+}
+function hideNotice() { $('notice').hidden = true; pendingConfirm = null; }
+
+function setTheme(id) {
+  theme = id;
+  document.documentElement.dataset.deck = id;
+  store.set('theme', id);
+  if (G) { ensureEls(); render(); }
+  document.querySelectorAll('.deckopt').forEach(b => b.setAttribute('aria-pressed', b.dataset.deck === id));
+}
+function openDecks() {
+  const sample = [[2, 12], [0, 13]];
+  $('decks').innerHTML = THEME_IDS.map(t => `<button type="button" class="deckopt" data-deck="${t}" aria-pressed="${t === theme}">
+    <span class="mini"><span class="card down">${backHTML(t)}</span>${sample.map(([s, r]) => `<span class="card up ${red(s) ? 'red' : 'black'}">${faceHTML(s, r, t)}</span>`).join('')}</span>
+    <b>${THEMES[t].name}</b><small>${THEMES[t].blurb}</small></button>`).join('');
+  $('deckPanel').hidden = false;
+  $('decks').querySelector('[aria-pressed="true"]').focus();
+}
+function openHelp() { $('help').hidden = false; $('help').querySelector('[data-close]').focus(); }
+function closePanels() { ['help', 'deckPanel', 'win'].forEach(id => { $(id).hidden = true; }); }
+
+/* ---------- win celebration ---------- */
+function celebrate() {
+  if (reduced.matches) { showWin(); return; }
+  const cv = document.createElement('canvas'), dpr = Math.min(2, devicePixelRatio || 1);
+  const W = innerWidth, H = innerHeight;
+  cv.className = 'cele'; cv.width = W * dpr; cv.height = H * dpr; cv.style.width = W + 'px'; cv.style.height = H + 'px';
+  document.body.appendChild(cv);
+  const ctx = cv.getContext('2d'); ctx.scale(dpr, dpr);
+  const css = getComputedStyle(document.documentElement), v = n => css.getPropertyValue(n).trim();
+  const col = { bg: v('--card-solid'), edge: v('--card-edge'), red: v('--red'), black: v('--black'), idx: v('--idx-font') };
+  const tr = table.getBoundingClientRect();
+  const founds = idsOf('found').map(id => st.p[id]);
+  const queue = [];
+  for (let d = 0, more = true; more; d++) { more = false; founds.forEach(f => { if (f.length > d) { more = true; queue.push(f[f.length - 1 - d]); } }); }
+  const cw = M.cw, ch = M.ch, active = [];
+  let last = 0;
+  cele = { cv, raf: 0 };
+  cv.addEventListener('pointerdown', () => endCelebrate());
+  const imgs = {};
+  queue.forEach(c => { const im = new Image(); im.src = faceImageURL(c.s, c.r, theme, Math.round(cw * 2), Math.round(ch * 2)); imgs[c.id] = im; });
+  const stamp = (c, x, y) => {
+    const im = imgs[c.id];
+    ctx.save(); ctx.beginPath(); ctx.roundRect(x, y, cw, ch, cw * .075);
+    if (im.complete && im.naturalWidth) { ctx.clip(); ctx.drawImage(im, x, y, cw, ch); }
+    else {
+      ctx.fillStyle = col.bg; ctx.fill(); ctx.clip();
+      ctx.fillStyle = red(c.s) ? col.red : col.black; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.font = `700 ${cw * .3}px ${col.idx}`; ctx.fillText(RANK[c.r], x + cw / 2, y + ch / 2);
+    }
+    ctx.restore();
+    ctx.strokeStyle = col.edge; ctx.lineWidth = 1; ctx.beginPath(); ctx.roundRect(x, y, cw, ch, cw * .075); ctx.stroke();
+  };
+  const frame = ts => {
+    if (!cele) return;
+    if (queue.length && ts - last > 170) {
+      last = ts;
+      const c = queue.shift(), el = els[c.id], p = el._p;
+      el.style.visibility = 'hidden';
+      const dir = Math.random() < .5 ? -1 : 1;
+      active.push({ c, x: tr.left + p.x, y: tr.top + p.y, vx: dir * (2.5 + Math.random() * 4), vy: -(2 + Math.random() * 6) });
+    }
+    for (let i = active.length - 1; i >= 0; i--) {
+      const a = active[i];
+      a.vy += .5; a.x += a.vx; a.y += a.vy;
+      if (a.y + ch > H) { a.y = H - ch; a.vy = -a.vy * .74; }
+      stamp(a.c, a.x, a.y);
+      if (a.x < -cw - 4 || a.x > W + 4) active.splice(i, 1);
+    }
+    if (!queue.length && !active.length) { setTimeout(() => endCelebrate(), 700); cele.raf = 0; return; }
+    cele.raf = requestAnimationFrame(frame);
+  };
+  cele.raf = requestAnimationFrame(frame);
+}
+function endCelebrate(silent) {
+  if (!cele) return;
+  cancelAnimationFrame(cele.raf);
+  cele.cv.remove(); cele = null;
+  for (const id in els) els[id].style.visibility = '';
+  render();
+  if (!silent) showWin();
+}
+function showWin() {
+  if (!st.won) return;
+  const s = store.get('stats.' + statsKey(), { played: 1, won: 1, best: st.elapsed });
+  const label = [G.name, ...G.opts.map(op => op.label(O[op.key]))].join(', ');
+  $('winLine').textContent = `${fmt(st.elapsed)} and ${st.moves} moves.`;
+  $('winStats').textContent = `${label}: won ${s.won} of ${s.played}. Best time ${fmt(s.best)}.`;
+  $('win').hidden = false;
+  $('wAgain').focus();
+}
+
+/* ---------- pointer input ---------- */
+function pileRect(pid) {
+  const m = meta[pid], [x, y] = slotXY(m);
+  if (m.kind !== 'tab') return { x, y, w: M.cw, h: M.ch };
+  const t = top(pid), ly = t && els[t.id]._p ? els[t.id]._p.y : y;
+  return { x, y, w: M.cw, h: ly - y + M.ch };
+}
+function findDrop(d, dx, dy) {
+  const b = d.base[0], r = { x: b.x + dx, y: b.y + dy, w: M.cw, h: M.ch };
+  const cards = st.p[d.pile].slice(d.idx);
+  if (!cards.length) return null;
+  let best = null, bestA = 0;
+  for (const m of piles) {
+    if (m.id === d.pile || !['found', 'cell', 'tab'].includes(m.kind)) continue;
+    const p = pileRect(m.id);
+    const ox = Math.min(r.x + r.w, p.x + p.w) - Math.max(r.x, p.x), oy = Math.min(r.y + r.h, p.y + p.h) - Math.max(r.y, p.y);
+    const area = ox > 0 && oy > 0 ? ox * oy : 0;
+    if (area > bestA && G.canDrop(cards, m.id)) { best = m.id; bestA = area; }
+  }
+  return best;
+}
+function setKbd(on) { kbd = on; table.classList.toggle('kbd', on); }
+
+function tryTarget(pid) {
+  const s = sel; sel = null;
+  if (!s || s.pile === pid) { render(); return; }
+  if (!move(s.pile, s.idx, pid)) { const c = st.p[s.pile][s.idx]; if (c) shake(c.id); render(); }
+}
+function clickCard(pid, i) {
+  const s = sel; sel = null;
+  if (s && s.pile === pid && s.idx === i) { if (!smart(pid, i)) render(); return; }
+  if (s && s.pile !== pid && move(s.pile, s.idx, pid)) return;
+  sel = { pile: pid, idx: i };
+  render();
+}
+function locate(id) {
+  for (const m of piles) { const i = st.p[m.id].findIndex(c => c.id === id); if (i >= 0) return { pile: m.id, idx: i }; }
+  return null;
+}
+
+table.addEventListener('pointerdown', e => {
+  if (e.button !== 0 || drag || cele) return;
+  setKbd(false); stopAuto();
+  const cardEl = e.target.closest('.card'), slotEl = e.target.closest('.slot');
+  if (!cardEl && !slotEl) { if (sel) { sel = null; render(); } return; }
+  if (!cardEl) {
+    const pid = slotEl.dataset.pile;
+    cur = { pile: pid, idx: -1 };
+    if (kindOf(pid) === 'stock') stockAction(); else if (sel) tryTarget(pid);
+    return;
+  }
+  const loc = locate(+cardEl.dataset.id);
+  if (!loc) return;
+  cur = { pile: loc.pile, idx: loc.idx };
+  if (kindOf(loc.pile) === 'stock') { stockAction(); return; }
+  if (st.won) return;
+  if (!G.canPick(loc.pile, loc.idx)) { if (sel) tryTarget(loc.pile); else shake(+cardEl.dataset.id); return; }
+  const ids = st.p[loc.pile].slice(loc.idx).map(c => c.id);
+  drag = { ...loc, ids, sx: e.clientX, sy: e.clientY, moved: false, base: ids.map(id => els[id]._p) };
+  table.setPointerCapture(e.pointerId);
+  e.preventDefault();
+});
+table.addEventListener('pointermove', e => {
+  if (!drag) return;
+  const dx = e.clientX - drag.sx, dy = e.clientY - drag.sy;
+  if (!drag.moved) {
+    if (Math.hypot(dx, dy) < 5) return;
+    drag.moved = true; sel = null; render();
+    drag.ids.forEach((id, k) => { els[id].classList.add('drag'); els[id].style.zIndex = 3000 + k; });
+  }
+  drag.ids.forEach((id, k) => { const b = drag.base[k]; els[id].style.transform = `translate(${Math.round(b.x + dx)}px,${Math.round(b.y + dy)}px)`; });
+});
+function endDrag(e) {
+  if (!drag) return;
+  const d = drag; drag = null;
+  d.ids.forEach(id => els[id].classList.remove('drag'));
+  if (d.moved) {
+    const t = e.type === 'pointerup' ? findDrop(d, e.clientX - d.sx, e.clientY - d.sy) : null;
+    d.ids.forEach((id, k) => { const b = d.base[k]; els[id]._p = { x: b.x + e.clientX - d.sx, y: b.y + e.clientY - d.sy }; });
+    if (!(t && move(d.pile, d.idx, t))) render();
+  } else if (e.type === 'pointerup') clickCard(d.pile, d.idx);
+}
+table.addEventListener('pointerup', endDrag);
+table.addEventListener('pointercancel', endDrag);
+table.addEventListener('dblclick', e => e.preventDefault());
+
+/* ---------- keyboard input ---------- */
+function firstUp(pid) { const i = st.p[pid].findIndex(c => c.up); return i < 0 ? st.p[pid].length - 1 : i; }
+function norm() {
+  if (!meta[cur.pile]) cur = { pile: rows[1][0].id, idx: Infinity };
+  const a = st.p[cur.pile];
+  if (kindOf(cur.pile) === 'tab') {
+    if (!a.length) cur.idx = -1;
+    else if (cur.idx < firstUp(cur.pile) || cur.idx >= a.length) cur.idx = a.length - 1;
+  } else cur.idx = a.length - 1;
+}
+const nearest = (row, col) => row.reduce((b, p) => Math.abs(p.col - col) < Math.abs(b.col - col) ? p : b);
+function moveCursor(d) {
+  norm();
+  const m = meta[cur.pile], row = rows[m.row], a = st.p[cur.pile];
+  if (d === 'left' || d === 'right') {
+    const k = row.indexOf(m);
+    cur = { pile: row[(k + (d === 'left' ? row.length - 1 : 1)) % row.length].id, idx: Infinity };
+  } else if (d === 'up') {
+    if (m.kind === 'tab' && a.length && cur.idx > firstUp(cur.pile)) cur.idx--;
+    else if (m.row === 1) cur = { pile: nearest(rows[0], m.col).id, idx: Infinity };
+  } else {
+    if (m.kind === 'tab' && cur.idx < a.length - 1) cur.idx++;
+    else if (m.row === 0) cur = { pile: nearest(rows[1], m.col).id, idx: Infinity };
+  }
+  render(); announce();
+}
+function activate() {
+  norm();
+  const { pile: p, idx: i } = cur;
+  if (kindOf(p) === 'stock') { stockAction(); return; }
+  const s = sel; sel = null;
+  if (s) {
+    if (s.pile === p && s.idx === i) { if (!smart(p, i)) render(); return; }
+    if (s.pile !== p && move(s.pile, s.idx, p)) { cur = { pile: p, idx: Infinity }; render(); return; }
+    if (s.pile === p && G.canPick(p, i)) sel = { pile: p, idx: i };
+    else { const c = st.p[s.pile][s.idx]; if (c) shake(c.id); }
+    render(); return;
+  }
+  if (i >= 0 && G.canPick(p, i)) { sel = { pile: p, idx: i }; render(); }
+  else if (i >= 0) shake(st.p[p][i].id);
+}
+function toPile(pid) {
+  if (sel) {
+    const s = sel; sel = null;
+    if (move(s.pile, s.idx, pid)) { cur = { pile: pid, idx: Infinity }; render(); }
+    else { const c = st.p[s.pile][s.idx]; if (c) shake(c.id); render(); }
+    return;
+  }
+  setKbd(true); cur = { pile: pid, idx: Infinity }; render(); announce();
+}
+function sendTo(kind) {
+  const src = sel || (kbd ? (norm(), cur) : null);
+  if (!src || src.idx < 0) return;
+  sel = null;
+  for (const t of idsOf(kind)) if (move(src.pile, src.idx, t)) return;
+  const c = st.p[src.pile][src.idx];
+  if (c) shake(c.id);
+  render();
+}
+
+addEventListener('keydown', e => {
+  const k = e.key;
+  if (cele) { e.preventDefault(); endCelebrate(); return; }
+  if (!$('help').hidden || !$('deckPanel').hidden) {
+    if (k === 'Escape' || k === '?') { e.preventDefault(); closePanels(); }
+    else if (k.toLowerCase() === 't' && !$('deckPanel').hidden) { cycleTheme(); }
+    return;
+  }
+  if (!$('win').hidden) {
+    if (k === 'Escape') $('win').hidden = true;
+    else if (k.toLowerCase() === 'n') { e.preventDefault(); newGame(true); }
+    return;
+  }
+  if (!$('notice').hidden) {
+    if (k === 'Escape' || k.toLowerCase() === 'n') { e.preventDefault(); hideNotice(); }
+    else if (k.toLowerCase() === 'y') { e.preventDefault(); const f = pendingConfirm; hideNotice(); f && f(); }
+    return;
+  }
+  if ((e.ctrlKey || e.metaKey) && k.toLowerCase() === 'z') { e.preventDefault(); undo(); return; }
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  const onButton = e.target.closest && e.target.closest('button');
+  if (k.startsWith('Arrow')) {
+    e.preventDefault();
+    if (onButton) onButton.blur();
+    if (!kbd) { setKbd(true); render(); announce(); return; }
+    moveCursor(k.slice(5).toLowerCase()); return;
+  }
+  if (k === ' ' || k === 'Enter') {
+    if (onButton) return;
+    e.preventDefault(); setKbd(true); activate(); return;
+  }
+  if (k === 'Escape') { if (sel) { sel = null; render(); } return; }
+  if (/^[0-9]$/.test(k)) {
+    const n = k === '0' ? 9 : +k - 1, tabs = tabIds();
+    if (n < tabs.length) { e.preventDefault(); toPile(tabs[n]); }
+    return;
+  }
+  switch (k.toLowerCase()) {
+    case 'f': sendTo('found'); break;
+    case 'c': sendTo('cell'); break;
+    case 'd': stockAction(); break;
+    case 'a': autoplay(); break;
+    case 'u': case 'backspace': undo(); break;
+    case 'n': newGame(false); break;
+    case 't': cycleTheme(); break;
+    case '?': case 'h': openHelp(); break;
+    default: return;
+  }
+  e.preventDefault();
+});
+function cycleTheme() { setTheme(THEME_IDS[(THEME_IDS.indexOf(theme) + 1) % THEME_IDS.length]); toast(THEMES[theme].name + ' deck'); }
+
+/* ---------- buttons ---------- */
+$('games').addEventListener('click', e => { const b = e.target.closest('[data-game]'); if (b) setGame(b.dataset.game); });
+$('opts').addEventListener('click', e => { const b = e.target.closest('[data-opt]'); if (b) setOpt(b.dataset.opt, +b.dataset.val); });
+$('bNew').addEventListener('click', () => newGame(false));
+$('bUndo').addEventListener('click', undo);
+$('bFinish').addEventListener('click', () => { autoHold = false; autoplay(); });
+$('bDeck').addEventListener('click', openDecks);
+$('bHelp').addEventListener('click', openHelp);
+$('nYes').addEventListener('click', () => { const f = pendingConfirm; hideNotice(); f && f(); });
+$('nNo').addEventListener('click', () => { hideNotice(); render(); });
+$('wAgain').addEventListener('click', () => newGame(true));
+$('decks').addEventListener('click', e => { const b = e.target.closest('[data-deck]'); if (b) setTheme(b.dataset.deck); });
+document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', closePanels));
+document.querySelectorAll('.overlay').forEach(o => o.addEventListener('pointerdown', e => { if (e.target === o) closePanels(); }));
+
+let resizeT = 0;
+addEventListener('resize', () => { cancelAnimationFrame(resizeT); resizeT = requestAnimationFrame(() => { if (!drag) render(); }); });
+setInterval(() => {
+  if (!G || !st.started || st.won || document.hidden) return;
+  st.elapsed++;
+  $('time').textContent = fmt(st.elapsed);
+  if (st.elapsed % 5 === 0) save();
+}, 1000);
+addEventListener('pagehide', () => { if (G) save(); });
+if (document.fonts) document.fonts.ready.then(() => { if (G) render(); });
+
+/* ---------- boot ---------- */
+function start(data) {
+  setTheme(data.theme || store.get('theme', 'casino'));
+  if (data.gid && data.st) {
+    startGame(data.gid, data.O, data.st);
+    history = data.history || [];
+    ui();
+    return;
+  }
+  const g = GAMES[store.get('game', 'klondike')] ? store.get('game', 'klondike') : 'klondike';
+  const sv = store.get('save.' + g, null);
+  const ok = sv && sv.st && !sv.st.won && validSave(g, sv);
+  startGame(g, ok ? sv.o : store.get('opts.' + g, GAMES[g].defaults), ok ? sv.st : null);
+}
+const hot = window.claude && window.claude.hot;
+if (hot && hot.snapshot) hot.snapshot(() => ({ gid, O, st, history, theme }));
+hot && hot.ready ? hot.ready(start) : start((hot && hot.data) || {});
+})();
+</script>

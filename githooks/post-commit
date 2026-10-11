@@ -1,0 +1,8 @@
+#!/bin/sh
+# Remind to republish the claude.ai artifact when the game source changes.
+if git diff-tree --no-commit-id --name-only -r HEAD | grep -qx 'solitaire.html'; then
+  echo
+  echo "solitaire.html changed: the claude.ai artifact is now behind."
+  echo "Ask Claude Code to republish it: https://claude.ai/artifact/E1mp2j3LHURJaSksszN5SJ"
+  echo
+fi
