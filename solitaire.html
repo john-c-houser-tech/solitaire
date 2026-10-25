@@ -119,6 +119,8 @@ button:disabled { opacity: .4; cursor: default; border-color: var(--line); }
 
 .foot { color: var(--ink-dim); font-size: .85rem; margin: 14px 0 0; }
 .foot kbd { font: 600 .78rem var(--ui-font); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; }
+.foot.made { margin-top: 4px; font-size: .78rem; }
+.foot.made a { color: inherit; text-underline-offset: 2px; }
 
 /* ---------- panels ---------- */
 .overlay { position: fixed; inset: 0; z-index: 5000; display: grid; place-items: center; padding: 16px;
@@ -183,6 +185,7 @@ button:disabled { opacity: .4; cursor: default; border-color: var(--line); }
   <div id="notice" class="notice" hidden><span id="noticeText"></span><button id="nYes" class="primary" type="button">Deal new game</button><button id="nNo" type="button">Keep playing</button></div>
   <main id="table" aria-label="Card table"></main>
   <p class="foot">Drag cards, or use the arrow keys and <kbd>Space</kbd>. Press <kbd>?</kbd> for every key.</p>
+  <p class="foot made">Made by <a href="https://nouriloop.com/">NouriLoop LLC</a></p>
 </div>
 
 <div id="help" class="overlay" hidden>
