@@ -1707,15 +1707,15 @@ addEventListener('keydown', e => {
   }
   if ((e.ctrlKey || e.metaKey) && k.toLowerCase() === 'z') { e.preventDefault(); undo(); return; }
   if (e.ctrlKey || e.metaKey || e.altKey) return;
-  const onButton = e.target.closest && e.target.closest('button');
+  const onControl = e.target.closest && e.target.closest('button, a[href]');
   if (k.startsWith('Arrow')) {
     e.preventDefault();
-    if (onButton) onButton.blur();
+    if (onControl) onControl.blur();
     if (!kbd) { setKbd(true); render(); announce(); return; }
     moveCursor(k.slice(5).toLowerCase()); return;
   }
   if (k === ' ' || k === 'Enter') {
-    if (onButton) return;
+    if (onControl) return;
     e.preventDefault(); setKbd(true); activate(); return;
   }
   if (k === 'Escape') { if (sel) { sel = null; render(); } return; }
