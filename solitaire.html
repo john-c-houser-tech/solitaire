@@ -43,6 +43,8 @@
 
 [hidden] { display: none !important; }
 html, body { height: 100%; }
+/* No double-tap zoom anywhere (pinch still works off the table): quick taps on cards and buttons are play, not a zoom request. */
+html { touch-action: manipulation; }
 body {
   margin: 0; background: var(--table); background-color: #0b0a08; background-attachment: fixed;
   color: var(--ink); font-family: var(--ui-font); overflow-x: hidden;
@@ -1626,6 +1628,9 @@ function endDrag(e) {
 table.addEventListener('pointerup', endDrag);
 table.addEventListener('pointercancel', endDrag);
 table.addEventListener('dblclick', e => e.preventDefault());
+/* iOS Safari sometimes still double-tap zooms on the table despite touch-action, and then the table blocks the pinch back out.
+   Cancelling touchend stops that zoom. Play runs on pointer events, which this leaves alone. */
+table.addEventListener('touchend', e => { if (e.cancelable) e.preventDefault(); });
 
 /* ---------- keyboard input ---------- */
 function firstUp(pid) { const i = st.p[pid].findIndex(c => c.up); return i < 0 ? st.p[pid].length - 1 : i; }
