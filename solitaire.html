@@ -43,7 +43,7 @@
 
 [hidden] { display: none !important; }
 html, body { height: 100%; }
-/* No double-tap zoom anywhere (pinch still works off the table): quick taps on cards and buttons are play, not a zoom request. */
+/* Ask for no double-tap zoom page-wide (pinch still works): quick taps on cards and buttons are play, not a zoom request. */
 html { touch-action: manipulation; }
 body {
   margin: 0; background: var(--table); background-color: #0b0a08; background-attachment: fixed;
@@ -79,7 +79,8 @@ button:disabled { opacity: .4; cursor: default; border-color: var(--line); }
 .notice span { flex: 1 1 220px; }
 
 /* ---------- board ---------- */
-#table { position: relative; touch-action: none; min-height: 200px; }
+/* pinch-zoom, not none: a zoomed-in player must be able to pinch back out over the table. */
+#table { position: relative; touch-action: pinch-zoom; min-height: 200px; }
 .slot {
   position: absolute; left: 0; top: 0; width: var(--cw); height: var(--ch); box-sizing: border-box;
   border: 1.5px solid var(--line); border-radius: calc(var(--cw) * .075);
@@ -1490,6 +1491,7 @@ function celebrate() {
   let last = 0;
   cele = { cv, raf: 0 };
   cv.addEventListener('pointerdown', () => endCelebrate());
+  cv.addEventListener('touchend', e => { if (e.cancelable) e.preventDefault(); });
   const imgs = {};
   queue.forEach(c => { const im = new Image(); im.src = faceImageURL(c.s, c.r, theme, Math.round(cw * 2), Math.round(ch * 2)); imgs[c.id] = im; });
   const stamp = (c, x, y) => {
@@ -1628,7 +1630,7 @@ function endDrag(e) {
 table.addEventListener('pointerup', endDrag);
 table.addEventListener('pointercancel', endDrag);
 table.addEventListener('dblclick', e => e.preventDefault());
-/* iOS Safari sometimes still double-tap zooms on the table despite touch-action, and then the table blocks the pinch back out.
+/* iOS Safari sometimes still double-tap zooms on the table despite touch-action (WebKit bug 218015).
    Cancelling touchend stops that zoom. Play runs on pointer events, which this leaves alone. */
 table.addEventListener('touchend', e => { if (e.cancelable) e.preventDefault(); });
 
